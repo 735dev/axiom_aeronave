@@ -1,0 +1,15 @@
+node_modules
+build
+dist
+.env
+*.local
+.gstack/
+tsconfig.tsbuildinfo
+test-results
+playwright-report
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.pem
+build-real

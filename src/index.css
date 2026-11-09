@@ -1,0 +1,125 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens de la marca Transvalor (transvalor_web): ladrillo #a83731 como color
+ * de acción, navy #1f273f para superficies fuertes, oro #e3ad2c como aviso.
+ * Inter para texto, Plus Jakarta Sans para títulos, monoespaciada para datos
+ * duros y para los rótulos de sección (el "01 — Sección" del sitio).
+ */
+@layer base {
+  :root {
+    --background: 240 5% 96%;
+    --foreground: 240 3% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 3% 12%;
+    --primary: 3 55% 43%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 240 3% 12%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 2% 44%;
+    --accent: 3 55% 96%;
+    --accent-foreground: 3 55% 30%;
+    --destructive: 3 60% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 48% 32%;
+    --warning: 43 69% 44%;
+    --info: 222 34% 34%;
+    --border: 240 8% 89%;
+    --input: 240 8% 89%;
+    --ring: 3 55% 43%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 17% 2%;
+    --foreground: 240 5% 96%;
+    --card: 240 4% 9%;
+    --card-foreground: 240 5% 96%;
+    --primary: 3 46% 54%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 240 5% 96%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 3% 64%;
+    --accent: 3 30% 18%;
+    --accent-foreground: 3 60% 82%;
+    --destructive: 3 55% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 45% 48%;
+    --warning: 43 74% 53%;
+    --info: 222 40% 62%;
+    --border: 240 5% 16%;
+    --input: 240 5% 20%;
+    --ring: 3 46% 54%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Títulos con la display de la marca y su tracking cerrado. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tightest;
+  }
+
+  /* Los datos duros van en monoespaciada: matrículas, códigos, montos. */
+  code,
+  .data {
+    @apply font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+}
+
+@layer components {
+  /* Rótulo de sección, calcado del "01 — Sección" del sitio de marca. */
+  .label-strip {
+    @apply font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground;
+  }
+
+  .hairline {
+    @apply border-b border-border;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .tracking-tightest {
+    letter-spacing: -0.03em;
+  }
+
+  .ease-apple {
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}

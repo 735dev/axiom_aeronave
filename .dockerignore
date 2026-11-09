@@ -1,0 +1,14 @@
+node_modules
+build
+dist
+android
+e2e
+test-results
+playwright-report
+.git
+.github
+.env
+.env.*
+!.env.example
+.gstack
+*.md

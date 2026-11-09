@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 76 30" fill="none" role="img" aria-label="Transvalor Orinoco">
+  <g stroke="#a83731" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M1.5 6.6 Q5.5 2.8 10 2 Q38 20.5 65 2 Q69.5 2.8 74.5 6.6" stroke-width="1"/>
+    <line x1="10" y1="2" x2="10" y2="28" stroke-width="1.5"/>
+    <line x1="65" y1="2" x2="65" y2="28" stroke-width="1.5"/>
+  </g>
+  <circle cx="10" cy="2" r="1.1" fill="#a83731"/>
+  <circle cx="65" cy="2" r="1.1" fill="#a83731"/>
+  <rect x="0" y="14.7" width="76" height="1.1" rx="0.5" fill="#a83731"/>
+  <rect x="0" y="17.4" width="76" height="3.4" rx="0.6" fill="#a83731"/>
+</svg>

@@ -1,0 +1,6 @@
+# Gitleaks: reglas por defecto. Las VITE_PUBLIC_* van al bundle publico y no son secretos;
+# este repo no tiene tokens falsos documentados, asi que NO hay allowlist.
+title = "aeronaves-frontend gitleaks"
+
+[extend]
+useDefault = true

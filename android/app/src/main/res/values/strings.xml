@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Aeronaves</string>
+    <string name="title_activity_main">Aeronaves</string>
+    <string name="package_name">com.axiom.aeronaves</string>
+    <string name="custom_url_scheme">com.axiom.aeronaves</string>
+</resources>
