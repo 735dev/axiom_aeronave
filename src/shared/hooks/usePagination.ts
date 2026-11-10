@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { SetStateAction } from 'react';
 import { env } from '@/shared/config/env';
 import { ApiResult, Paginated } from '@/shared/api/types';
 import { notify } from '@/shared/utils/notify';
@@ -52,5 +53,27 @@ export function usePagination<T, Q extends object>({
   // Lo que la cola envió al volver la red debe aparecer sin recargar.
   useReloadOnSync(() => void load(), enabled);
 
-  return { page, limit, params, total: meta.total, links: meta.links, items, isLoading, setPage, setLimit, setParams, reload: load };
+  // Cambiar cuántos se muestran o con qué se filtra invalida la página actual.
+  const changeLimit = useCallback((next: number) => {
+    setLimit(next);
+    setPage(1);
+  }, []);
+  const changeParams = useCallback((next: SetStateAction<Q>) => {
+    setParams(next);
+    setPage(1);
+  }, []);
+
+  return {
+    page,
+    limit,
+    params,
+    total: meta.total,
+    links: meta.links,
+    items,
+    isLoading,
+    setPage,
+    setLimit: changeLimit,
+    setParams: changeParams,
+    reload: load,
+  };
 }

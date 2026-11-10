@@ -26,6 +26,10 @@ export interface TicketsQuery {
   mine?: boolean;
   is_root?: boolean;
   open?: boolean;
+  aircraft?: string;
+  /** Rango de creación, `YYYY-MM-DD`. */
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

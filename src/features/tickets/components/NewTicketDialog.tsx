@@ -40,6 +40,7 @@ export function NewTicketDialog({
   const [isSubmitting, setSubmitting] = useState(false);
   const [files, setFiles] = useState<AttachmentInput[]>([]);
   const [proposal, setProposal] = useState<Extraction | undefined>();
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | undefined>();
 
   // Con la primera foto el sistema lee el comprobante y propone el renglón.
   // Si no puede (ilegible, sin señal) la carga sigue siendo manual, sin trabar.
@@ -68,6 +69,7 @@ export function NewTicketDialog({
 
   const close = () => {
     setSelected(null);
+    setFieldErrors(undefined);
     setFiles([]);
     setProposal(undefined);
     onOpenChange(false);
@@ -114,6 +116,7 @@ export function NewTicketDialog({
       close();
       return;
     }
+    setFieldErrors(res.fieldErrors ? { ...res.fieldErrors } : undefined);
     notify.fromApiError(res);
     // Si falló al subir un soporte, el registro ya pudo haberse creado.
     if (files.length > 0) onCreated();
@@ -171,6 +174,7 @@ export function NewTicketDialog({
               fields={selected.fields}
               isSubmitting={isSubmitting}
               proposal={proposal}
+              serverErrors={fieldErrors}
               onSubmit={onSubmit}
               onCancel={close}
               submitLabel="tickets.create"

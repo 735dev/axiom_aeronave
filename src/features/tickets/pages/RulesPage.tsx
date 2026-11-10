@@ -3,13 +3,19 @@ import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import { createRule, getRules, updateRule } from '../api/ticketsApi';
 import { useTicketTypes } from '../hooks/useTickets';
 import { BusinessRule, RuleAction, RuleField, RuleOperator } from '../types/ticket.types';
-import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Select } from '@/shared/components/ui/select';
 import { Label } from '@/shared/components/ui/label';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { ClientPagination } from '@/shared/components/list/ClientPagination';
+import { DataTable, Column } from '@/shared/components/list/DataTable';
+import { useClientList } from '@/shared/hooks/useClientList';
+import { CsvColumn } from '@/shared/utils/csv';
+import { loadRows } from '@/shared/utils/fetchAllPages';
 import { useT } from '@/shared/hooks/useT';
 import { notify } from '@/shared/utils/notify';
 
@@ -52,6 +58,57 @@ export function RulesPage() {
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const typeName = (code: string) => types.find((x) => x.code === code)?.name ?? code;
+  const ruleSummary = (rule: BusinessRule) =>
+    rule.field === 'amount_vs_route'
+      ? formatRouteLimits(rule.route_limits).replace(/\n/g, ' · ')
+      : `${t(`rules.fields.${rule.field}`)} ${t(`rules.operators.${rule.operator}`)} ${rule.value ?? ''}`;
+
+  const list = useClientList<BusinessRule>({
+    items: rules,
+    searchText: (r) => `${r.name} ${r.message} ${typeName(r.type_code)}`,
+    filters: {
+      type: (r, v) => r.type_code === v,
+      state: (r, v) => (v === 'active') === r.is_active,
+      action: (r, v) => r.action === v,
+    },
+  });
+
+  const filters: FilterDef[] = [
+    {
+      key: 'type',
+      label: t('listData.ticketType'),
+      type: 'select',
+      options: types.map((x) => ({ value: x.code, label: x.name })),
+    },
+    {
+      key: 'state',
+      label: t('listData.state'),
+      type: 'select',
+      options: [
+        { value: 'active', label: t('listData.stateActive') },
+        { value: 'inactive', label: t('listData.stateInactive') },
+      ],
+    },
+    {
+      key: 'action',
+      label: t('listData.ruleAction'),
+      type: 'select',
+      options: ACTIONS.map((a) => ({ value: a, label: t(`rules.actions.${a}`) })),
+    },
+  ];
+
+  const csvColumns: CsvColumn<BusinessRule>[] = [
+    { header: t('listData.csv.name'), value: (r) => r.name },
+    { header: t('listData.csv.type'), value: (r) => typeName(r.type_code) },
+    { header: t('listData.csv.field'), value: (r) => t(`rules.fields.${r.field}`) },
+    { header: t('listData.csv.operator'), value: (r) => t(`rules.operators.${r.operator}`) },
+    { header: t('listData.csv.value'), value: (r) => (r.field === 'amount_vs_route' ? ruleSummary(r) : r.value) },
+    { header: t('listData.csv.action'), value: (r) => t(`rules.actions.${r.action}`) },
+    { header: t('listData.csv.message'), value: (r) => r.message },
+    { header: t('listData.csv.active'), value: (r) => t(r.is_active ? 'common.yes' : 'common.no') },
+  ];
 
   const load = useCallback(async () => {
     const res = await getRules();
@@ -97,6 +154,52 @@ export function RulesPage() {
     void load();
   };
 
+  const startEdit = (rule: BusinessRule) => {
+    setEditingId(rule.id);
+    setDraft({
+      name: rule.name,
+      type_code: rule.type_code,
+      field: rule.field,
+      operator: rule.operator,
+      value: String(rule.value ?? ''),
+      action: rule.action,
+      message: rule.message,
+      limits: formatRouteLimits(rule.route_limits),
+    });
+    setCreating(true);
+  };
+
+  const tableColumns: Column<BusinessRule>[] = [
+    {
+      key: 'name',
+      header: 'listData.csv.name',
+      primary: true,
+      cell: (rule) => (
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 font-medium">
+            {rule.is_active ? (
+              <ShieldCheck className="h-4 w-4 text-success" />
+            ) : (
+              <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+            )}
+            {rule.name}
+            {!rule.is_active && <Badge>{t('rules.inactive')}</Badge>}
+          </p>
+          <p className="mt-1 text-sm font-normal text-muted-foreground">{rule.message}</p>
+        </div>
+      ),
+    },
+    { key: 'type', header: 'listData.csv.type', cell: (rule) => <Badge variant="info">{typeName(rule.type_code)}</Badge> },
+    { key: 'rule', header: 'listData.csv.field', cell: (rule) => <span className="data text-xs text-muted-foreground">{ruleSummary(rule)}</span> },
+    {
+      key: 'action',
+      header: 'listData.csv.action',
+      cell: (rule) => (
+        <Badge variant={rule.action === 'warn' ? 'warning' : 'danger'}>{t(`rules.actions.${rule.action}`)}</Badge>
+      ),
+    },
+  ];
+
   return (
     <section className="space-y-5 p-4 md:p-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -107,64 +210,41 @@ export function RulesPage() {
         <Button onClick={() => setCreating(true)}>{t('rules.new')}</Button>
       </header>
 
-      <div className="space-y-3">
-        {rules.map((rule) => (
-          <Card key={rule.id} className="p-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 font-medium">
-                  {rule.is_active ? (
-                    <ShieldCheck className="h-4 w-4 text-success" />
-                  ) : (
-                    <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  {rule.name}
-                  {!rule.is_active && <Badge>{t('rules.inactive')}</Badge>}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{rule.message}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Badge variant="info">
-                    {types.find((x) => x.code === rule.type_code)?.name ?? rule.type_code}
-                  </Badge>
-                  <span className="data text-xs text-muted-foreground">
-                    {rule.field === 'amount_vs_route'
-                      ? formatRouteLimits(rule.route_limits).replace(/\n/g, ' · ')
-                      : `${t(`rules.fields.${rule.field}`)} ${t(`rules.operators.${rule.operator}`)} ${rule.value ?? ''}`}
-                  </span>
-                  <Badge variant={rule.action === 'warn' ? 'warning' : 'danger'}>
-                    {t(`rules.actions.${rule.action}`)}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setEditingId(rule.id);
-                    setDraft({
-                      name: rule.name,
-                      type_code: rule.type_code,
-                      field: rule.field,
-                      operator: rule.operator,
-                      value: String(rule.value ?? ''),
-                      action: rule.action,
-                      message: rule.message,
-                      limits: formatRouteLimits(rule.route_limits),
-                    });
-                    setCreating(true);
-                  }}
-                >
-                  {t('common.edit')}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => void toggle(rule)}>
-                  {rule.is_active ? t('rules.disable') : t('rules.enable')}
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <ListToolbar
+        search={list.search}
+        onSearch={list.setSearch}
+        searchPlaceholder={t('listData.searchRules')}
+        filters={filters}
+        values={list.values}
+        onFilter={list.setFilter}
+        onClear={list.clear}
+        actions={
+          <ExportButton
+            filename={t('rules.title')}
+            columns={csvColumns}
+            load={loadRows(list.filtered)}
+            disabled={list.total === 0}
+          />
+        }
+      />
+      <DataTable
+        columns={tableColumns}
+        rows={list.rows}
+        rowKey={(rule) => rule.id}
+        emptyMessage={rules.length > 0 ? 'list.noResults' : 'common.empty'}
+        actions={(rule) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => startEdit(rule)}>
+              {t('common.edit')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void toggle(rule)}>
+              {rule.is_active ? t('rules.disable') : t('rules.enable')}
+            </Button>
+          </>
+        )}
+      />
+
+      <ClientPagination list={list} />
 
       <Dialog
         open={creating}

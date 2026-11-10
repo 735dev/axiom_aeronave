@@ -77,7 +77,17 @@ const s = {
   ground: 'tierra@transvalor.com',
   admin: 'admin@transvalor.com',
   super: 'super@transvalor.com',
+  avsec: 'avsec@transvalor.com',
+  general: 'gerencia@transvalor.com',
 };
+
+/** Las cuatro firmas del cierre, como en el formato TVOA: capitán, mantenimiento, AVSEC y gerencia. */
+const SIGNING = [
+  { step: 'sign_captain', email: s.pilot },
+  { step: 'sign_maintenance', email: s.maint },
+  { step: 'sign_avsec', email: s.avsec },
+  { step: 'sign_general', email: s.general },
+] as const;
 
 test('una operación real recorre el ciclo completo (Alcance §12)', async ({ browser }) => {
   const su = await Api.as(s.super);
@@ -307,7 +317,7 @@ test('una operación real recorre el ciclo completo (Alcance §12)', async ({ br
 
     await page.goto(`/tickets/${opId}`);
     await expect(page.getByTestId('closing-blockers')).toBeVisible();
-    await expect(page.getByTestId('sign-and-close')).toBeDisabled();
+    await expect(page.getByTestId('close-operation')).toBeDisabled();
     await page.context().close();
 
     // El servidor no tiene otra puerta: el cambio de estado también se rechaza.
@@ -378,10 +388,16 @@ test('una operación real recorre el ciclo completo (Alcance §12)', async ({ br
     await decideAll(pilot, opId, ['requirements', 'technical']);
     await decideAll(ground, opId, ['ground']);
 
-    // La firma de quien cierra es la de su perfil.
-    await ops.patch('/auth/me/signature/', {
-      signature_url: `data:image/png;base64,${signaturePng().toString('base64')}`,
-    });
+    // Cada firmante carga su rúbrica en su perfil y firma su paso; el cierre exige las cuatro.
+    const signature = `data:image/png;base64,${signaturePng().toString('base64')}`;
+    const signers = new Map<string, Api>();
+    for (const { step, email } of SIGNING) {
+      const api = await Api.as(email);
+      await api.patch('/auth/me/signature/', { signature_url: signature });
+      signers.set(step, api);
+    }
+    // Quien cierra (Operaciones) también tiene su rúbrica.
+    await ops.patch('/auth/me/signature/', { signature_url: signature });
 
     const page = await sessionAs(browser, s.ops);
     await page.goto(`/tickets/${opId}`);
@@ -389,14 +405,40 @@ test('una operación real recorre el ciclo completo (Alcance §12)', async ({ br
     await expect(totals).toContainText('USD');
     await expect(totals).toContainText('VES');
     await expect(page.getByTestId('closing-support-group').first()).toBeVisible();
-    await expect(page.getByTestId('sign-and-close')).toBeEnabled();
-    await page.getByTestId('sign-and-close').click();
-    await expect(page.getByTestId('closing-stamp')).toBeVisible();
-    await expect(page.getByTestId('closing-stamp').locator('img')).toHaveAttribute(
+
+    // Faltan las firmas: no se puede cerrar y el motivo las nombra.
+    await expect(page.getByTestId('close-operation')).toBeDisabled();
+    await expect(page.getByTestId('closing-reason')).toContainText('4 firma');
+
+    // Las tres primeras firmas por HTTP con el usuario de cada rol; con tres sigue sin cerrar.
+    for (const { step } of SIGNING.slice(0, 3)) {
+      await signers.get(step)!.post(`/tickets/${opId}/decisions/`, { step_code: step, decision: 'done' });
+    }
+    await page.reload();
+    await expect(page.getByTestId('close-operation')).toBeDisabled();
+    await expect(page.getByTestId('closing-reason')).toContainText('1 firma');
+    await page.context().close();
+
+    // La última firma, la de gerencia general, por la interfaz.
+    const general = await sessionAs(browser, s.general);
+    await general.goto(`/tickets/${opId}`);
+    await expect(general.getByTestId('sign-sign_general')).toBeEnabled();
+    await general.getByTestId('sign-sign_general').click();
+    await expect(general.getByTestId('signer-sign_general')).toHaveAttribute('data-state', 'signed');
+    await general.context().close();
+
+    const closer = await sessionAs(browser, s.ops);
+    await closer.goto(`/tickets/${opId}`);
+    await expect(closer.getByTestId('close-operation')).toBeEnabled();
+    await closer.getByTestId('close-operation').click();
+    await expect(closer.getByTestId('closing-stamp')).toBeVisible();
+    // El sello muestra las cuatro rúbricas.
+    await expect(closer.getByTestId('closing-signature')).toHaveCount(4);
+    await expect(closer.getByTestId('closing-signature').first().locator('img')).toHaveAttribute(
       'src',
       /^data:image\/png/,
     );
-    await page.context().close();
+    await closer.context().close();
 
     const closed = (await su.get(`/tickets/${opId}/`)).data;
     expect(closed.status_code).toBe('closed');

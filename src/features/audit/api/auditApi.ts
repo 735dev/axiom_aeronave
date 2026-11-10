@@ -21,3 +21,23 @@ export async function getAuditEvents(
     return handleErrorAxios(e as never);
   }
 }
+
+/** CSV de la bitácora que arma el servidor con los mismos filtros; ya trae BOM. */
+export async function exportAuditCsv(
+  params: AuditFilters,
+): Promise<ApiResult<{ filename: string; text: string }>> {
+  try {
+    const res = await apiAxios.get({
+      url: `/audit/export/?${qs({ ...params })}`,
+      config: { responseType: 'text', transformResponse: (d: unknown) => d },
+    });
+    if (res.status === 200 && typeof res.data === 'string') {
+      const disposition = String(res.headers?.['content-disposition'] ?? '');
+      const filename = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'auditoria.csv';
+      return { ok: true, data: { filename, text: res.data.replace(/^\uFEFF/, '') } };
+    }
+    return handleMessageAxios(res.data);
+  } catch (e) {
+    return handleErrorAxios(e as never);
+  }
+}

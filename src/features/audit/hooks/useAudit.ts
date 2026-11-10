@@ -9,7 +9,7 @@ export function useAuditLog(filters: AuditFilters) {
   return usePagination<AuditEvent, AuditQuery>({
     fetcher: getAuditEvents,
     initialParams,
-    initialLimit: 20,
+    initialLimit: 25,
   });
 }
 

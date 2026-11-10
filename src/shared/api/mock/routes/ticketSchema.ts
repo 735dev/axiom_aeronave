@@ -31,6 +31,7 @@ export function normalizeFields(raw: unknown): FieldDef[] {
         help: f.help || undefined,
         options: Array.isArray(f.options) ? f.options : undefined,
         catalog: f.catalog,
+        depends_on: f.depends_on || undefined,
         read_only: Boolean(f.read_only),
         // Sin esto, guardar el tipo borraba qué campo es el monto y quién lo ve.
         role: f.role || undefined,
@@ -84,6 +85,7 @@ export function normalizeSteps(raw: unknown, roles: RoleLike[]): StepDef[] {
         role_name: role?.name,
         responsible_area: s.responsible_area || undefined,
         required: s.required ?? true,
+        requires_signature: s.requires_signature === true,
         sort_order: index + 1,
       } as StepDef;
     })

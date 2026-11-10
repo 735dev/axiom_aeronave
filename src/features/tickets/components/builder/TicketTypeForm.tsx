@@ -303,6 +303,7 @@ export function TicketTypeForm({ type, allTypes, onSuccess, onClose }: Props) {
                   code: '',
                   name: '',
                   required: true,
+                  requires_signature: false,
                   sort_order: prev.length + 1,
                 },
               ])

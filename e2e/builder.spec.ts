@@ -27,3 +27,19 @@ test('el constructor deja marcar qué campo es el monto y un rol no se repite', 
   expect(await roles.nth(1).inputValue()).toBe('amount');
   expect(await roles.nth(0).inputValue()).not.toBe('amount');
 });
+
+test('el constructor deja marcar qué pasos exigen firma en el cierre', async ({ page }) => {
+  await login(page, 'super@transvalor.com');
+  await page.getByRole('link', { name: 'Catálogos' }).click();
+  await page.getByText('Tipos de ticket').first().click();
+  await page
+    .getByRole('button', { name: /Editar formulario/ })
+    .first()
+    .click();
+  await page.getByRole('button', { name: /^Pasos/ }).click();
+  const toggles = page.getByTestId('step-requires-signature');
+  await expect(toggles.first()).toBeVisible();
+  const before = await toggles.first().isChecked();
+  await toggles.first().click();
+  expect(await toggles.first().isChecked()).toBe(!before);
+});

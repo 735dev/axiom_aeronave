@@ -269,6 +269,16 @@ export const roles: Role[] = [
     permissions: ['tickets.view', 'tickets.decide_any', 'notifications.view', 'analytics.view'],
     users_count: 1,
   },
+  {
+    id: 'r-8',
+    code: 'avsec',
+    name: 'Coordinación AVSEC',
+    description: 'Seguridad de aviación: coordina traslados al taller y retorno al hangar, y firma el cierre.',
+    is_system: false,
+    is_active: true,
+    permissions: ['tickets.view', 'tickets.edit', 'notifications.view'],
+    users_count: 1,
+  },
 ];
 
 export const appUsers: AppUser[] = [
@@ -279,6 +289,7 @@ export const appUsers: AppUser[] = [
   { id: 'u-4', full_name: 'Deivis Salazar', email: 'tierra@transvalor.com', role_id: 'r-5', role_name: 'Apoyo en tierra', granted_permissions: [], revoked_permissions: [], location: 'Paramillo', is_active: true, created_at: '2026-08-03T09:00:00.000Z' },
   { id: 'u-5', full_name: 'Carolina Méndez', email: 'admin@transvalor.com', role_id: 'r-6', role_name: 'Administración', granted_permissions: [], revoked_permissions: [], location: 'Caracas', is_active: true, created_at: '2026-08-03T09:00:00.000Z' },
   { id: 'u-7', full_name: 'Gerencia General', email: 'gerencia@transvalor.com', role_id: 'r-7', role_name: 'Gerencia General', granted_permissions: [], revoked_permissions: [], location: 'Caracas', is_active: true, created_at: '2026-08-03T09:00:00.000Z' },
+  { id: 'u-8', full_name: 'Coordinación AVSEC', email: 'avsec@transvalor.com', role_id: 'r-8', role_name: 'Coordinación AVSEC', granted_permissions: [], revoked_permissions: [], location: 'Caracas', is_active: true, created_at: '2026-08-03T09:00:00.000Z' },
 ];
 
 function item(
@@ -332,9 +343,15 @@ export const catalogItems: CatalogItem[] = [
   item('aircraft_statuses', 'watch', 'En observación', 2),
   item('aircraft_statuses', 'grounded', 'Fuera de servicio', 3, true),
 
-  item('aircrafts', 'YV2323', 'King Air 200', 1, false, 'ac-1'),
-  item('aircrafts', 'YV2528', 'Cheyenne', 2, false, 'ac-2'),
-  item('aircrafts', 'YV2822', 'King Air 200', 3, false, 'ac-3'),
+  item('aircraft_brands', 'beechcraft', 'Beechcraft', 1),
+  item('aircraft_brands', 'piper', 'Piper', 2),
+
+  item('aircraft_models', 'king_air_200', 'King Air 200', 1, false, 'beechcraft'),
+  item('aircraft_models', 'cheyenne', 'Cheyenne', 2, false, 'piper'),
+
+  item('aircrafts', 'YV2323', 'King Air 200', 1, false, 'king_air_200'),
+  item('aircrafts', 'YV2528', 'Cheyenne', 2, false, 'cheyenne'),
+  item('aircrafts', 'YV2822', 'King Air 200', 3, false, 'king_air_200'),
 
   item('airports', 'CCS', 'Maiquetía', 1),
   item('airports', 'PZO', 'Puerto Ordaz', 2),
@@ -354,6 +371,8 @@ export const CATALOG_DEFINITIONS: Array<{ key: CatalogKey; name: string; descrip
   { key: 'operation_kinds', name: 'Tipos de operación', description: 'Llevar y esperar, dejar e irse, u otros' },
   { key: 'operation_scopes', name: 'Alcances', description: 'Nacional o internacional' },
   { key: 'aircraft_statuses', name: 'Estados de aeronave', description: 'Resultado posible de un reporte técnico' },
+  { key: 'aircraft_brands', name: 'Marcas de aeronave', description: 'Fabricantes de las aeronaves de la flota' },
+  { key: 'aircraft_models', name: 'Modelos de aeronave', description: 'Modelos, cada uno ligado a su marca' },
   { key: 'aircrafts', name: 'Aeronaves', description: 'Flota registrada, con matrícula y modelo' },
   { key: 'airports', name: 'Aeropuertos', description: 'Códigos y nombres usados en las rutas' },
   { key: 'locations', name: 'Sedes', description: 'Ubicaciones donde opera el personal' },

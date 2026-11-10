@@ -1,8 +1,13 @@
 import { useReloadOnSync } from '@/shared/offline/syncEvents';
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CircleAlert, FileCheck2, PenLine, Printer } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Clock, FileCheck2, PenLine, Printer } from 'lucide-react';
 import { ClosingBlocker, ClosingSummary, Ticket, TicketType } from '../types/ticket.types';
+import {
+  blockersWithoutSignatures,
+  signerState,
+  signersProgress,
+} from '../utils/closingSigners';
 import { decideStep, updateTicket } from '../api/ticketsApi';
 import { getClosingSummary } from '../api/closingApi';
 import { AttachmentImage } from './AttachmentImage';
@@ -12,8 +17,6 @@ import { useT } from '@/shared/hooks/useT';
 import { notify } from '@/shared/utils/notify';
 import { formatDateTime } from '@/shared/utils/formatters';
 import { cn } from '@/shared/utils/cn';
-
-const SIGNATURE_STEP = 'signature';
 
 function money(value: number, currency: string): string {
   return `${new Intl.NumberFormat('es-VE', {
@@ -31,19 +34,21 @@ interface Props {
   type?: TicketType;
   /** El usuario puede editar este tipo y el expediente sigue abierto. */
   canEdit: boolean;
-  /** Se llama tras firmar y cerrar, para que la página recargue el ticket. */
-  onClosed: () => void;
+  /** Se llama tras firmar un paso o cerrar, para que la página recargue el ticket. */
+  onChanged: () => void;
 }
 
 /**
  * Cierre firmado de la operación: reúne en una vista lo que quien firma debe
- * revisar (avance, gasto, soportes, pendientes) y, una vez cerrada, deja el
- * sello. Todo lo calcula el servidor; acá solo se muestra y se dispara la firma.
+ * revisar (avance, gasto, soportes, pendientes), recoge la firma de cada
+ * responsable y, una vez cerrada, deja el sello. Todo lo calcula el servidor;
+ * acá solo se muestra y se disparan las firmas y el cierre.
  */
-export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
+export function ClosingPanel({ ticket, type, canEdit, onChanged }: Props) {
   const t = useT();
   const [summary, setSummary] = useState<ClosingSummary | null>(null);
-  const [isSigning, setSigning] = useState(false);
+  const [signingStep, setSigningStep] = useState<string | null>(null);
+  const [isClosing, setClosing] = useState(false);
 
   const load = useCallback(async () => {
     const res = await getClosingSummary(ticket.id);
@@ -61,9 +66,7 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
 
   // La imagen de la firma solo viaja en el resumen de cierre; el ticket trae el sello sin ella.
   const stamp = summary.stamp ?? ticket.closing;
-  const hard = summary.blockers.filter(
-    (b) => !(b.kind === 'pending_step' && b.step_code === SIGNATURE_STEP),
-  );
+  const hard = blockersWithoutSignatures(summary.blockers, summary.signers);
   const blockerText = (b: ClosingBlocker): string => {
     if (b.kind === 'pending_step')
       return t('closing.blocker.pending_step', { name: b.detail ?? '' });
@@ -73,41 +76,48 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
         name: b.detail ?? '',
       });
     }
+    if (b.kind === 'signature') return t('closing.blocker.signature', { role: b.role_name ?? '' });
     return t(`closing.blocker.${b.kind}`, { code: b.ticket_code });
   };
 
-  const { signer } = summary;
-  const needsOwnSignature = !signer.step_signed && !signer.has_signature;
-  // El motivo exacto: cuántos son y cuál es el primero.
+  const progress = signersProgress(summary.signers);
+  // El motivo exacto: cuántos son y cuál es el primero; si no hay pendientes, las firmas que faltan.
   const first = hard[0];
   const reason = first
     ? `${t('closing.reasonBlockers', { count: hard.length })} ${blockerText(first)} ${
         first.ticket_id !== ticket.id ? first.ticket_code : ''
       }`.trim()
-    : needsOwnSignature
-      ? t('closing.reasonNoSignature')
-      : undefined;
+    : progress.pending.length > 0
+      ? t('closing.reasonSignatures', { count: progress.pending.length })
+      : !summary.ready
+        ? t('closing.reasonNotReady')
+        : undefined;
 
   const finalStatus = type?.statuses.find((s) => s.is_final && s.counts_as_committed);
-  const showAction = canEdit && !ticket.status_is_final && signer.can_sign && Boolean(finalStatus);
+  const open = !ticket.status_is_final;
+  const showClose = canEdit && open && Boolean(finalStatus);
 
-  const signAndClose = async () => {
-    if (!finalStatus) return;
-    setSigning(true);
-    // Un paso ya firmado con rúbrica no se vuelve a registrar: se cierra directo.
-    if (!signer.step_signed) {
-      const signed = await decideStep(ticket.id, { step_code: SIGNATURE_STEP, decision: 'done' });
-      if (!signed.ok) {
-        setSigning(false);
-        notify.fromApiError(signed);
-        return;
-      }
+  const signStep = async (stepCode: string) => {
+    setSigningStep(stepCode);
+    const signed = await decideStep(ticket.id, { step_code: stepCode, decision: 'done' });
+    setSigningStep(null);
+    if (!signed.ok) {
+      notify.fromApiError(signed);
+      return;
     }
+    notify.toast.success(t('closing.signedOk'));
+    onChanged();
+    void load();
+  };
+
+  const closeOperation = async () => {
+    if (!finalStatus) return;
+    setClosing(true);
     const closed = await updateTicket(ticket.id, { status_code: finalStatus.code });
-    setSigning(false);
+    setClosing(false);
     if (closed.ok) {
       notify.toast.success(t('closing.closedOk'));
-      onClosed();
+      onChanged();
       return;
     }
     notify.fromApiError(closed);
@@ -144,22 +154,52 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
         {stamp && (
           <div
             data-testid="closing-stamp"
-            className="grid gap-4 rounded-lg border border-success/40 bg-success/5 p-4 sm:grid-cols-[auto_1fr] print:break-inside-avoid"
+            className="space-y-4 rounded-lg border border-success/40 bg-success/5 p-4 print:break-inside-avoid"
           >
-            <div className="flex h-24 w-48 items-center justify-center rounded-md bg-white p-2">
-              {stamp.signature_url && (
-                <img
-                  src={stamp.signature_url}
-                  alt={t('closing.stampSignature')}
-                  className="max-h-full max-w-full object-contain"
-                />
-              )}
-            </div>
+            {stamp.signatures && stamp.signatures.length > 0 ? (
+              <ul
+                data-testid="closing-signatures"
+                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+              >
+                {stamp.signatures.map((sig) => (
+                  <li
+                    key={sig.step_code}
+                    data-testid="closing-signature"
+                    className="space-y-1.5 text-center print:break-inside-avoid"
+                  >
+                    <div className="flex h-20 items-center justify-center rounded-md bg-white p-2">
+                      <img
+                        src={sig.signature_url}
+                        alt={`${t('users.signatureOf')} ${sig.user_name}`}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
+                    <p className="label-strip">{sig.role_name}</p>
+                    <p className="text-sm font-medium">{sig.user_name}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateTime(sig.signed_at)}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
+                <div className="flex h-24 w-48 items-center justify-center rounded-md bg-white p-2">
+                  {stamp.signature_url && (
+                    <img
+                      src={stamp.signature_url}
+                      alt={t('closing.stampSignature')}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  )}
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="font-medium">
+                    {t('closing.signedBy', { name: stamp.signed_by, role: stamp.signed_role })}
+                  </p>
+                  <p className="text-muted-foreground">{formatDateTime(stamp.signed_at)}</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-1 text-sm">
-              <p className="font-medium">
-                {t('closing.signedBy', { name: stamp.signed_by, role: stamp.signed_role })}
-              </p>
-              <p className="text-muted-foreground">{formatDateTime(stamp.signed_at)}</p>
               <p className="data">
                 {t('closing.stampTotals', {
                   amount: money(stamp.totals.committed_base, stamp.totals.base_currency),
@@ -171,6 +211,68 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
               </p>
             </div>
           </div>
+        )}
+
+        {open && summary.signers.length > 0 && (
+          <section className="space-y-2" data-testid="closing-signers">
+            <h3 className="label-strip">
+              {t('closing.signatures')} ({progress.signed}/{progress.total})
+            </h3>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {summary.signers.map((sg) => {
+                const state = signerState(sg);
+                return (
+                  <li
+                    key={sg.step_code}
+                    data-testid={`signer-${sg.step_code}`}
+                    data-state={state}
+                    className={cn(
+                      'flex items-center justify-between gap-3 rounded-lg border p-3',
+                      state === 'signed' ? 'border-success/40 bg-success/5' : 'border-border',
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start gap-2">
+                      {state === 'signed' ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                      ) : (
+                        <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium">{sg.role_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{sg.step_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {sg.signed
+                            ? `${sg.signed_by_name ?? ''} · ${sg.signed_at ? formatDateTime(sg.signed_at) : ''}`
+                            : t('closing.signerPending')}
+                        </p>
+                        {state === 'mine' && !sg.has_signature && (
+                          <p className="text-xs text-warning">
+                            {t('closing.reasonNoSignature')}{' '}
+                            <Link to="/perfil" className="text-primary hover:underline">
+                              {t('closing.goToProfile')}
+                            </Link>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {state === 'mine' && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        data-testid={`sign-${sg.step_code}`}
+                        className="shrink-0 print:hidden"
+                        disabled={!sg.has_signature || signingStep !== null}
+                        onClick={() => void signStep(sg.step_code)}
+                      >
+                        <PenLine className="h-4 w-4" />
+                        {t('closing.sign')}
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         )}
 
         <section className="space-y-2">
@@ -327,7 +429,9 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
           <section className="space-y-2" data-testid="closing-blockers">
             <h3 className="label-strip">{t('closing.blockers')}</h3>
             {hard.length === 0 ? (
-              <p className="text-sm text-success">{t('closing.noBlockers')}</p>
+              <p className={cn('text-sm', progress.pending.length === 0 ? 'text-success' : 'text-muted-foreground')}>
+                {progress.pending.length === 0 ? t('closing.noBlockers') : t('closing.onlySignatures')}
+              </p>
             ) : (
               <ul className="space-y-1.5">
                 {hard.map((b, i) => (
@@ -354,32 +458,24 @@ export function ClosingPanel({ ticket, type, canEdit, onClosed }: Props) {
           </section>
         )}
 
-        {showAction && (
+        {showClose && (
           <div className="space-y-2 border-t border-border pt-4 print:hidden">
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
-                data-testid="sign-and-close"
-                disabled={Boolean(reason) || isSigning}
-                onClick={() => void signAndClose()}
+                data-testid="close-operation"
+                disabled={Boolean(reason) || !summary.ready || isClosing}
+                onClick={() => void closeOperation()}
               >
-                <PenLine className="h-4 w-4" />
-                {t('closing.signAndClose')}
+                <FileCheck2 className="h-4 w-4" />
+                {t('closing.close')}
               </Button>
               {reason && (
                 <p data-testid="closing-reason" className="text-sm text-muted-foreground">
-                  {reason}{' '}
-                  {hard.length === 0 && needsOwnSignature && (
-                    <Link to="/perfil" className="text-primary hover:underline">
-                      {t('closing.goToProfile')}
-                    </Link>
-                  )}
+                  {reason}
                 </p>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t('closing.signAs', { name: signer.user_name, role: signer.role_name })}
-            </p>
           </div>
         )}
       </CardContent>

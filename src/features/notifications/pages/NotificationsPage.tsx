@@ -2,12 +2,16 @@ import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { useLiveRefresh } from '../hooks/useLiveRefresh';
 import { useNotifications } from '../hooks/useNotifications';
-import { markAllNotificationsRead, markNotificationRead } from '../api/notificationsApi';
-import { AppNotification } from '../types/notification.types';
+import { getNotifications, markAllNotificationsRead, markNotificationRead } from '../api/notificationsApi';
+import { AppNotification, NotificationKind } from '../types/notification.types';
 import { Button } from '@/shared/components/ui/button';
-import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
+import { Column, DataTable } from '@/shared/components/list/DataTable';
 import { PaginatedComplete } from '@/shared/components/pagination/PaginatedComplete';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { CsvColumn } from '@/shared/utils/csv';
+import { fetchAllPages } from '@/shared/utils/fetchAllPages';
 import { useT } from '@/shared/hooks/useT';
 import { formatDateTime } from '@/shared/utils/formatters';
 import { cn } from '@/shared/utils/cn';
@@ -22,6 +26,16 @@ const BORDER_BY_KIND: Record<string, string> = {
   technical_report: 'border-l-amber-500',
   operation_closed: 'border-l-emerald-500',
 };
+
+const KINDS: NotificationKind[] = [
+  'operation_created',
+  'ticket_assigned',
+  'navaid_pending',
+  'close_blocked',
+  'technical_report',
+  'receipt_validation',
+  'operation_closed',
+];
 
 export function NotificationsPage() {
   const t = useT();
@@ -42,7 +56,25 @@ export function NotificationsPage() {
     if (n.ticket_id) navigate(`/tickets/${n.ticket_id}`);
   };
 
-  const onlyUnread = list.params.unread === true;
+  const filterDefs: FilterDef[] = [
+    {
+      key: 'kind',
+      label: t('list.filter.kind'),
+      type: 'select',
+      options: KINDS.map((k) => ({ value: k, label: t(`notifications.kind.${k}`) })),
+    },
+  ];
+
+  const exportColumns: CsvColumn<AppNotification>[] = [
+    { header: t('list.col.created'), value: (n) => formatDateTime(n.created_at) },
+    { header: t('list.col.kind'), value: (n) => t(`notifications.kind.${n.kind}`) },
+    { header: t('list.col.body'), value: (n) => n.body },
+    { header: t('list.col.operation'), value: (n) => n.operation_code },
+    { header: t('list.col.audience'), value: (n) => n.audience.join(' / ') },
+    { header: t('list.col.read'), value: (n) => (n.read ? t('common.yes') : t('common.no')) },
+  ];
+
+  const onlyUnread = list.filters.unread === 'true';
   const markAll = async () => {
     const res = await markAllNotificationsRead();
     if (!res.ok) {
@@ -51,6 +83,37 @@ export function NotificationsPage() {
     }
     void list.reload();
   };
+
+  const columns: Column<AppNotification>[] = [
+    {
+      key: 'kind',
+      header: 'list.col.kind',
+      primary: true,
+      cell: (n) => (
+        <span className="flex items-center gap-2 font-medium">
+          {t(`notifications.kind.${n.kind}`)}
+          {!n.read && <Bell className="h-3.5 w-3.5 shrink-0 text-primary" />}
+        </span>
+      ),
+    },
+    { key: 'body', header: 'list.col.body', cell: (n) => <span className="text-muted-foreground">{n.body}</span> },
+    {
+      key: 'audience',
+      header: 'list.col.audience',
+      cell: (n) => (
+        <span className="flex flex-wrap gap-1.5 md:justify-start">
+          {n.audience.map((a) => (
+            <Badge key={a}>{a}</Badge>
+          ))}
+        </span>
+      ),
+    },
+    {
+      key: 'created',
+      header: 'list.col.created',
+      cell: (n) => <span className="data text-xs text-muted-foreground">{formatDateTime(n.created_at)}</span>,
+    },
+  ];
 
   return (
     <section className="space-y-5 p-4 md:p-6">
@@ -61,7 +124,7 @@ export function NotificationsPage() {
             size="sm"
             variant={onlyUnread ? 'default' : 'outline'}
             data-testid="notifications-unread-filter"
-            onClick={() => list.setParams({ unread: onlyUnread ? undefined : true })}
+            onClick={() => list.setFilter('unread', onlyUnread ? '' : 'true')}
           >
             {t('notifications.onlyUnread')}
           </Button>
@@ -76,39 +139,32 @@ export function NotificationsPage() {
         </div>
       </div>
 
-      {list.items.length === 0 && !list.isLoading && (
-        <p className="py-10 text-center text-sm text-muted-foreground">
-          {t('notifications.empty')}
-        </p>
-      )}
+      <ListToolbar
+        filters={filterDefs}
+        values={list.filters}
+        onFilter={list.setFilter}
+        onClear={list.clear}
+        actions={
+          <ExportButton
+            filename="avisos"
+            columns={exportColumns}
+            disabled={list.total === 0}
+            load={() => fetchAllPages(getNotifications, list.query)}
+          />
+        }
+      />
 
-      <div className="space-y-3">
-        {list.items.map((n) => (
-          <Card
-            key={n.id}
-            onClick={() => void onOpen(n)}
-            className={cn(
-              'cursor-pointer border-l-4 p-4',
-              BORDER_BY_KIND[n.kind] ?? 'border-l-border',
-              n.read && 'opacity-60',
-            )}
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-sm font-medium">{t(`notifications.kind.${n.kind}`)}</p>
-              {!n.read && <Bell className="h-3.5 w-3.5 shrink-0 text-primary" />}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{n.body}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {n.audience.map((a) => (
-                <Badge key={a}>{a}</Badge>
-              ))}
-              <span className="ml-auto text-xs text-muted-foreground">
-                {formatDateTime(n.created_at)}
-              </span>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <DataTable
+        columns={columns}
+        rows={list.items}
+        rowKey={(n) => n.id}
+        isLoading={list.isLoading}
+        emptyMessage="notifications.empty"
+        onRowClick={(n) => void onOpen(n)}
+        rowClassName={(n) =>
+          cn('border-l-4', BORDER_BY_KIND[n.kind] ?? 'border-l-border', n.read && 'opacity-60')
+        }
+      />
 
       <PaginatedComplete
         page={list.page}
@@ -116,6 +172,7 @@ export function NotificationsPage() {
         total={list.total}
         links={list.links}
         onPageChange={list.setPage}
+        onLimitChange={list.setLimit}
       />
     </section>
   );

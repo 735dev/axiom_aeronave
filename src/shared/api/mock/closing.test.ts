@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { routeMockRequest } from './router';
-import { PNG, USERS, dataUrlOfBytes, loginAs, newExpense } from '@/test/mockApi';
+import { PNG, SIGNING_STEPS, USERS, dataUrlOfBytes, loginAs, newExpense } from '@/test/mockApi';
 
 type Sess = ReturnType<typeof loginAs>;
 
@@ -24,11 +24,13 @@ const attach = (
   data_url = PDF,
   mime = 'application/pdf',
 ) => s.post(`/tickets/${id}/attachments/`, { name, mime, size: 9, data_url });
-const sign = (s: Sess, id: string) =>
-  s.post(`/tickets/${id}/decisions/`, { step_code: 'signature', decision: 'done' });
+const sign = (s: Sess, id: string, step: string = SIGNING_STEPS[0]) =>
+  s.post(`/tickets/${id}/decisions/`, { step_code: step, decision: 'done' });
+/** Las cuatro firmas del cierre con una misma sesión (Operaciones decide por cualquier rol). */
+const signAll = (s: Sess, id: string) => SIGNING_STEPS.forEach((step) => sign(s, id, step));
 const auditEvents = (s: Sess) => (s.get('/audit/', { limit: '100' }).data.data ?? []) as any[];
 
-/** Operación con todo resuelto salvo la firma: pasos, reporte técnico y gastos con soporte. */
+/** Operación con todo resuelto salvo las firmas: pasos, reporte técnico y gastos con soporte. */
 function readyOp(s: Sess = ops()) {
   const op = newOp(s);
   ['planning', 'requirements', 'ground', 'technical'].forEach((step_code) =>
@@ -149,9 +151,10 @@ describe('firma en el propio perfil', () => {
     const pilot = loginAs(USERS.pilot);
     pilot.patch('/auth/me/signature/', { signature_url: '' });
     const op = newOp(s);
-    const bySuper = sign(pilot, op.id).data.decisions.find((d: any) => d.step_code === 'signature');
+    const step = SIGNING_STEPS[0];
+    const bySuper = sign(pilot, op.id).data.decisions.find((d: any) => d.step_code === step);
     expect(bySuper.signature_url).toBeUndefined();
-    const byOps = sign(s, op.id).data.decisions.find((d: any) => d.step_code === 'signature');
+    const byOps = sign(s, op.id).data.decisions.find((d: any) => d.step_code === step);
     expect(byOps.signature_url).toBe(PNG);
   });
 });
@@ -206,7 +209,6 @@ describe('resumen de cierre: avance por rol', () => {
     expect(after.done).toBe(before.done + 1);
     expect(before.pending.some((p: string) => p.includes('Planificación'))).toBe(true);
     expect(after.pending.some((p: string) => p.includes('Planificación'))).toBe(false);
-    expect(after.pending.some((p: string) => p.includes('Firma de cierre'))).toBe(true);
   });
 
   it('los pendientes nombran el ticket al que pertenecen', () => {
@@ -344,12 +346,32 @@ describe('resumen de cierre: bloqueos', () => {
     expect(d.ready).toBe(false);
   });
 
-  it('con todo resuelto salvo la firma, ready es verdadero', () => {
+  it('con todo resuelto salvo las firmas, cada firma faltante es un bloqueo con su rol', () => {
     const s = ops();
+    s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
     attach(s, newExpense(s, op.id).data.id);
     const d = closing(s, op.id).data;
-    expect(d.blockers.map((b: any) => b.step_code)).toEqual(['signature']);
+    expect(d.blockers.map((b: any) => [b.kind, b.step_code])).toEqual(
+      SIGNING_STEPS.map((step) => ['signature', step]),
+    );
+    expect(d.blockers.map((b: any) => b.role_name)).toEqual([
+      'Piloto',
+      'Mantenimiento',
+      'Coordinación AVSEC',
+      'Gerencia General',
+    ]);
+    expect(d.ready).toBe(false);
+  });
+
+  it('con todo resuelto y las cuatro firmas, ready es verdadero', () => {
+    const s = ops();
+    s.patch('/auth/me/signature/', { signature_url: PNG });
+    const op = readyOp(s);
+    attach(s, newExpense(s, op.id).data.id);
+    signAll(s, op.id);
+    const d = closing(s, op.id).data;
+    expect(d.blockers).toEqual([]);
     expect(d.ready).toBe(true);
   });
 
@@ -358,7 +380,7 @@ describe('resumen de cierre: bloqueos', () => {
     s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
     const exp = newExpense(s, op.id).data;
-    sign(s, op.id);
+    signAll(s, op.id);
     const r = s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
     expect(r.status).toBe(422);
     expect(r.data.detail).toContain(exp.code);
@@ -369,28 +391,66 @@ describe('resumen de cierre: bloqueos', () => {
     s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
     attach(s, newExpense(s, op.id).data.id, 'recibo.png', PNG, 'image/png');
-    sign(s, op.id);
+    signAll(s, op.id);
     const r = s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
     expect(r.status).toBe(422);
     expect(r.data.detail).toMatch(/sin validar/);
   });
 });
 
-describe('resumen de cierre: firmante', () => {
+describe('resumen de cierre: firmantes', () => {
+  it('lista los cuatro pasos firmables en orden, con su rol, sin firmar', () => {
+    const op = newOp(ops());
+    const d = closing(ops(), op.id).data;
+    expect(d.signers.map((x: any) => x.step_code)).toEqual([...SIGNING_STEPS]);
+    expect(d.signers.map((x: any) => x.role_code)).toEqual([
+      'pilot',
+      'maintenance',
+      'avsec',
+      'executive',
+    ]);
+    d.signers.forEach((x: any) => {
+      expect(x).toMatchObject({ required: true, signed: false, signed_by_name: null, signed_at: null });
+    });
+  });
+
   it('informa si el usuario tiene firma cargada', () => {
     const s = ops();
     const op = newOp(s);
     s.patch('/auth/me/signature/', { signature_url: '' });
-    expect(closing(s, op.id).data.signer.has_signature).toBe(false);
+    expect(closing(s, op.id).data.signers.every((x: any) => x.has_signature === false)).toBe(true);
     s.patch('/auth/me/signature/', { signature_url: PNG });
-    expect(closing(s, op.id).data.signer.has_signature).toBe(true);
+    expect(closing(s, op.id).data.signers.every((x: any) => x.has_signature === true)).toBe(true);
   });
 
-  it('puede firmar quien tiene el rol del paso o decide_any; el piloto no', () => {
+  it('puede firmar quien tiene el rol del paso o decide_any', () => {
     const op = newOp(ops());
-    expect(closing(ops(), op.id).data.signer.can_sign).toBe(true);
-    expect(closing(loginAs(USERS.superuser), op.id).data.signer.can_sign).toBe(true);
-    expect(closing(loginAs(USERS.pilot), op.id).data.signer.can_sign).toBe(false);
+    const canSign = (email: string) =>
+      (closing(loginAs(email), op.id).data.signers as any[]).map((x) => x.can_sign);
+    expect(canSign(USERS.operations)).toEqual([true, true, true, true]);
+    expect(canSign(USERS.superuser)).toEqual([true, true, true, true]);
+    expect(canSign(USERS.pilot)).toEqual([true, false, false, false]);
+    expect(canSign(USERS.maintenance)).toEqual([false, true, false, false]);
+    expect(canSign(USERS.avsec)).toEqual([false, false, true, false]);
+    expect(canSign(USERS.director)).toEqual([true, true, true, true]);
+  });
+
+  it('cada firmante queda firmado con su nombre y hora al decidir', () => {
+    const op = newOp(ops());
+    const pilot = loginAs(USERS.pilot);
+    pilot.patch('/auth/me/signature/', { signature_url: PNG });
+    sign(pilot, op.id, 'sign_captain');
+    const [captain, maintenance] = closing(ops(), op.id).data.signers;
+    expect(captain).toMatchObject({ signed: true, signed_by_name: 'Cap. Luis Rodríguez' });
+    expect(new Date(captain.signed_at).getTime()).not.toBeNaN();
+    expect(maintenance.signed).toBe(false);
+  });
+
+  it('un rol ajeno no puede firmar el paso de otro: 403', () => {
+    const op = newOp(ops());
+    const pilot = loginAs(USERS.pilot);
+    expect(sign(pilot, op.id, 'sign_maintenance').status).toBe(403);
+    expect(sign(pilot, op.id, 'sign_captain').status).toBe(200);
   });
 });
 
@@ -399,7 +459,7 @@ describe('cierre firmado', () => {
     const s = ops();
     s.patch('/auth/me/signature/', { signature_url: '' });
     const op = readyOp(s);
-    sign(s, op.id);
+    signAll(s, op.id);
     const r = s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
     expect(r.status).toBe(422);
     expect(r.data.detail).toContain('cargar su firma en su perfil');
@@ -412,18 +472,55 @@ describe('cierre firmado', () => {
     const s = ops();
     s.patch('/auth/me/signature/', { signature_url: '' });
     const op = readyOp(s);
-    sign(s, op.id);
+    signAll(s, op.id);
     expect(s.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(422);
     s.patch('/auth/me/signature/', { signature_url: PNG });
-    sign(s, op.id);
+    signAll(s, op.id);
     expect(s.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(200);
   });
 
-  it('sin la decisión de firma no se cierra aunque la firma esté cargada', () => {
+  it('sin las decisiones de firma no se cierra aunque la firma esté cargada', () => {
     const s = ops();
     s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
     expect(s.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(422);
+  });
+
+  it('con una sola firma faltante no se cierra y el mensaje nombra a quien falta', () => {
+    const s = ops();
+    s.patch('/auth/me/signature/', { signature_url: PNG });
+    const op = readyOp(s);
+    SIGNING_STEPS.slice(0, 3).forEach((step) => sign(s, op.id, step));
+    const r = s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
+    expect(r.status).toBe(422);
+    expect(r.data.detail).toContain('Gerencia General');
+    expect(s.get(`/tickets/${op.id}/`).data.status_is_final).toBe(false);
+  });
+
+  it('cuatro firmantes distintos sellan cuatro firmas, cada una con su nombre y su rúbrica', () => {
+    const owner = ops();
+    owner.patch('/auth/me/signature/', { signature_url: PNG });
+    const op = readyOp(owner);
+    const signers = [
+      [USERS.pilot, SIGNING_STEPS[0]],
+      [USERS.maintenance, SIGNING_STEPS[1]],
+      [USERS.avsec, SIGNING_STEPS[2]],
+      [USERS.director, SIGNING_STEPS[3]],
+    ] as const;
+    signers.forEach(([email, step]) => {
+      const u = loginAs(email);
+      u.patch('/auth/me/signature/', { signature_url: JPG });
+      expect(sign(u, op.id, step).status).toBe(200);
+    });
+    expect(owner.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(200);
+    const sigs = closing(owner, op.id).data.stamp.signatures as any[];
+    expect(sigs.map((x) => x.user_name)).toEqual([
+      'Cap. Luis Rodríguez',
+      'Ramón Prieto',
+      'Coordinación AVSEC',
+      'Gerencia General',
+    ]);
+    sigs.forEach((x) => expect(x.signature_url).toBe(JPG));
   });
 
   it('el sello trae quién, rol, rúbrica, cuándo, totales, archivos y carpeta', () => {
@@ -434,16 +531,22 @@ describe('cierre firmado', () => {
     attach(s, exp.id);
     attach(s, op.id, 'm.pdf');
     s.patch(`/tickets/${exp.id}/`, { status_code: 'verified' });
-    sign(s, op.id);
+    signAll(s, op.id);
     const before = closing(s, op.id).data;
     expect(s.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(200);
     const stamp = s.get(`/tickets/${op.id}/`).data.closing;
     expect(stamp).toMatchObject({
       signed_by: 'Freya Marcano',
-      signed_role: 'Gerencia de Operaciones',
       signature_url: PNG,
       files_count: 2,
     });
+    expect(stamp.signatures.map((x: any) => x.step_code)).toEqual([...SIGNING_STEPS]);
+    expect(stamp.signatures.map((x: any) => x.role_name)).toEqual([
+      'Piloto',
+      'Mantenimiento',
+      'Coordinación AVSEC',
+      'Gerencia General',
+    ]);
     expect(new Date(stamp.signed_at).getTime()).not.toBeNaN();
     expect(stamp.folder).toMatch(/^20\d\d-/);
     expect(stamp.totals.committed_base).toBe(exp.money.amount_base);
@@ -454,7 +557,7 @@ describe('cierre firmado', () => {
     const s = ops();
     s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
-    sign(s, op.id);
+    signAll(s, op.id);
     s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
     expect(closing(s, op.id).data.closed).toBe(true);
   });
@@ -481,7 +584,7 @@ describe('sello inmutable', () => {
     const s = ops();
     s.patch('/auth/me/signature/', { signature_url: PNG });
     const op = readyOp(s);
-    sign(s, op.id);
+    signAll(s, op.id);
     s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
     return { s, op };
   }

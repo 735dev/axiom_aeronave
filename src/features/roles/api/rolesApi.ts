@@ -5,6 +5,8 @@ import { Module, Permission, Role } from '../types/role.types';
 
 export interface RolesQuery {
   q?: string;
+  is_active?: boolean;
+  is_system?: boolean;
   page?: number;
   limit?: number;
 }

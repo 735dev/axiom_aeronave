@@ -139,6 +139,16 @@ export function StepEditor({ step, index, total, roles, onChange, onRemove, onMo
           />
           {t('ticketTypes.stepRequired')}
         </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            data-testid="step-requires-signature"
+            className="h-4 w-4 accent-[hsl(var(--primary))]"
+            checked={step.requires_signature ?? false}
+            onChange={(e) => set({ requires_signature: e.target.checked })}
+          />
+          {t('ticketTypes.stepRequiresSignature')}
+        </label>
       </div>
     </Row>
   );

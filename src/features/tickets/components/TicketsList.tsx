@@ -1,93 +1,113 @@
-import { Link } from 'react-router-dom';
 import { AlertTriangle, MessageSquare, Paperclip, Plane } from 'lucide-react';
-import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
+import { Column, DataTable } from '@/shared/components/list/DataTable';
 import { useT } from '@/shared/hooks/useT';
 import { formatDateTime } from '@/shared/utils/formatters';
-import { cn } from '@/shared/utils/cn';
 import { Ticket } from '../types/ticket.types';
 
 interface Props {
   items: Ticket[];
   isLoading: boolean;
+  /** Listado dentro de un expediente: no repite a qué operación pertenece cada ticket. */
   compact?: boolean;
 }
+
+const isOverdue = (ticket: Ticket) =>
+  Boolean(ticket.due_at && !ticket.status_is_final && new Date(ticket.due_at) < new Date());
 
 export function TicketsList({ items, isLoading, compact }: Props) {
   const t = useT();
 
-  if (isLoading) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">{t('common.loading')}</p>;
-  }
-  if (items.length === 0) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">{t('tickets.empty')}</p>;
-  }
+  const columns: Column<Ticket>[] = [
+    {
+      key: 'code',
+      header: 'list.col.code',
+      primary: true,
+      cell: (ticket) => <span className="data text-sm font-medium tracking-tight">{ticket.code}</span>,
+    },
+    {
+      key: 'title',
+      header: 'list.col.title',
+      cell: (ticket) => (
+        <div className="min-w-0">
+          <p>{ticket.title}</p>
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            <span className="font-medium">{ticket.type_name}</span>
+            {!compact && ticket.parent_code && (
+              <span className="flex items-center gap-1">
+                <Plane className="h-3 w-3" />
+                {ticket.parent_code}
+              </span>
+            )}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'list.col.status',
+      cell: (ticket) => <Badge variant={ticket.status_color}>{ticket.status_name}</Badge>,
+    },
+    {
+      key: 'assigned',
+      header: 'list.col.assigned',
+      cell: (ticket) => (
+        <span className="text-muted-foreground">
+          {ticket.assigned_user_name ?? ticket.assigned_role_name ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'activity',
+      header: 'list.col.activity',
+      cell: (ticket) => (
+        <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground md:justify-start">
+          {ticket.children_count > 0 && (
+            <span>
+              {ticket.children_count} {t('tickets.childrenShort')}
+            </span>
+          )}
+          {ticket.attachments > 0 && (
+            <span className="flex items-center gap-1">
+              <Paperclip className="h-3 w-3" />
+              {ticket.attachments}
+            </span>
+          )}
+          {ticket.comments.length > 0 && (
+            <span className="flex items-center gap-1">
+              <MessageSquare className="h-3 w-3" />
+              {ticket.comments.length}
+            </span>
+          )}
+          {isOverdue(ticket) && (
+            <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+              <AlertTriangle className="h-3 w-3" />
+              {t('tickets.overdue')}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'updated',
+      header: 'list.col.updated',
+      cell: (ticket) => (
+        <span className="data whitespace-nowrap text-xs text-muted-foreground">
+          {formatDateTime(ticket.updated_at)}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-3">
-      {items.map((ticket) => {
-        const overdue =
-          ticket.due_at && !ticket.status_is_final && new Date(ticket.due_at) < new Date();
-
-        return (
-          <Link key={ticket.id} to={`/tickets/${ticket.id}`} className="block">
-            <Card
-              className={cn(
-                'border-l-2 border-l-transparent transition-colors hover:border-l-primary hover:bg-muted/40',
-                compact ? 'p-3' : 'p-3.5',
-              )}
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="data text-sm font-medium tracking-tight">{ticket.code}</span>
-                <Badge variant={ticket.status_color}>{ticket.status_name}</Badge>
-              </div>
-
-              <p className="mt-0.5 text-sm text-muted-foreground">{ticket.title}</p>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">{ticket.type_name}</span>
-                {ticket.assigned_role_name && (
-                  <span className="text-xs text-muted-foreground">
-                    · {ticket.assigned_role_name}
-                  </span>
-                )}
-                {!compact && ticket.parent_code && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Plane className="h-3 w-3" />
-                    {ticket.parent_code}
-                  </span>
-                )}
-                {ticket.children_count > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {ticket.children_count} {t('tickets.childrenShort')}
-                  </span>
-                )}
-                {ticket.attachments > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Paperclip className="h-3 w-3" />
-                    {ticket.attachments}
-                  </span>
-                )}
-                {ticket.comments.length > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MessageSquare className="h-3 w-3" />
-                    {ticket.comments.length}
-                  </span>
-                )}
-                {overdue && (
-                  <span className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-                    <AlertTriangle className="h-3 w-3" />
-                    {t('tickets.overdue')}
-                  </span>
-                )}
-                <span className="data ml-auto text-xs text-muted-foreground">
-                  {formatDateTime(ticket.updated_at)}
-                </span>
-              </div>
-            </Card>
-          </Link>
-        );
-      })}
-    </div>
+    <DataTable
+      columns={columns}
+      rows={items}
+      rowKey={(ticket) => ticket.id}
+      isLoading={isLoading}
+      emptyMessage="tickets.empty"
+      rowHref={(ticket) => `/tickets/${ticket.id}`}
+      rowClassName={(ticket) => (isOverdue(ticket) ? 'border-l-2 border-l-destructive' : undefined)}
+    />
   );
 }

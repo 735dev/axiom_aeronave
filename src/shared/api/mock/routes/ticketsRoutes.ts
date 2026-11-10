@@ -17,6 +17,7 @@ import {
   unregisterTypePermissions,
 } from './adminRoutes';
 import { normalizeFields, normalizeStatuses, normalizeSteps, slug } from './ticketSchema';
+import { aircraftIncoherence } from './aircraftCoherence';
 import { currentAuditActor, diffValues, recordAudit } from '../auditDb';
 import { routePassengerSearch } from '../passengers';
 import { resolveMoney } from '../money';
@@ -253,6 +254,9 @@ function createTicket(body: Record<string, unknown>): MockResponse {
     );
   }
 
+  const incoherent = aircraftIncoherence(type, payload);
+  if (incoherent) return validation('Marca, modelo y matrícula no son coherentes.', incoherent);
+
   const parent = ticketState.tickets.find((t) => t.id === String(body.parent_id ?? ''));
   const parentLocked = parent ? lockedResponse(parent, 'agregar trabajo a') : undefined;
   if (parentLocked) return parentLocked;
@@ -445,8 +449,12 @@ function updateTicket(id: string, body: Record<string, unknown>): MockResponse {
         );
       }
       if (target.counts_as_committed) {
+        // Las firmas tienen su propio mensaje: nombran al rol que falta.
         const pendingSteps = type.steps.filter(
-          (s) => s.required && !ticket.decisions.some((d) => d.step_code === s.code),
+          (s) =>
+            s.required &&
+            !s.requires_signature &&
+            !ticket.decisions.some((d) => d.step_code === s.code),
         );
         if (pendingSteps.length > 0) {
           return validation(
@@ -488,6 +496,11 @@ function updateTicket(id: string, body: Record<string, unknown>): MockResponse {
   }
 
   if (body.payload !== undefined) {
+    const incoherent = aircraftIncoherence(type, {
+      ...ticket.payload,
+      ...(body.payload as Record<string, unknown>),
+    });
+    if (incoherent) return validation('Marca, modelo y matrícula no son coherentes.', incoherent);
     ticket.payload = { ...ticket.payload, ...(body.payload as Record<string, unknown>) };
 
     // El importe se recalcula con la tasa vigente del padre y se vuelve a
@@ -752,6 +765,15 @@ function decide(id: string, body: Record<string, unknown>): MockResponse {
   const value = (body.decision as Decision['decision']) ?? 'done';
   const signer = adminState.users.find((u) => u.id === currentAuditActor().id);
 
+  // Un paso de firma lo decide su rol, o quien puede decidir por cualquier rol.
+  if (
+    step.requires_signature &&
+    signer?.role_id !== step.role_id &&
+    !effectivePermissionsFor(signer?.id ?? '').includes('tickets.decide_any')
+  ) {
+    return { status: 403, data: { title: 'errors.forbiddenTitle' } };
+  }
+
   const decision: Decision = {
     id: uniqueId('d'),
     step_code: step.code,
@@ -760,7 +782,10 @@ function decide(id: string, body: Record<string, unknown>): MockResponse {
     observation: body.observation ? String(body.observation) : undefined,
     decided_by: String(body.decided_by ?? signer?.full_name ?? 'Usuario actual'),
     decided_at: new Date().toISOString(),
-    signature_url: value === 'done' ? signer?.signature_url : undefined,
+    // Solo los pasos de firma copian la rúbrica del perfil de quien decide.
+    signature_url:
+      value === 'done' && step.requires_signature ? signer?.signature_url : undefined,
+    signed: value === 'done' && step.requires_signature && Boolean(signer?.signature_url),
   };
   // Registrar de nuevo un paso reemplaza la decisión en el ticket; la
   // anterior sobrevive únicamente en la bitácora, por eso se guarda el diff.

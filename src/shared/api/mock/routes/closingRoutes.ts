@@ -3,9 +3,13 @@ import {
   ClosingExpenseRow,
   ClosingMoneyBlock,
   ClosingRoleProgress,
+  ClosingSigner,
+  ClosingSignature,
   ClosingStamp,
   ClosingSummary,
   ClosingSupport,
+  Decision,
+  StepDef,
   Ticket,
   TicketType,
 } from '@/features/tickets/types/ticket.types';
@@ -14,8 +18,16 @@ import { folderIdFor } from '../blackbox';
 import { computeTotals, conceptLabel } from '../totals';
 import { adminState, effectivePermissionsFor, MockResponse } from './adminRoutes';
 
-/** Paso cuya decisión es la firma del cierre. */
-export const SIGNATURE_STEP = 'signature';
+/** Pasos cuya decisión es una firma del cierre: los marca el tipo, no el código. */
+export function signingSteps(type: TicketType | undefined): StepDef[] {
+  return (type?.steps ?? []).filter((s) => s.requires_signature);
+}
+
+/** La firma vale si la decisión se cumplió y trae la rúbrica de quien firmó. */
+function signedDecision(root: Ticket, stepCode: string): Decision | undefined {
+  const d = root.decisions.find((x) => x.step_code === stepCode);
+  return d?.decision === 'done' && d.signature_url ? d : undefined;
+}
 
 type TypeOf = (code: string) => TicketType | undefined;
 
@@ -81,7 +93,10 @@ export function closingBlockers(root: Ticket, all: Ticket[], typeOf: TypeOf): Cl
   const blockers: ClosingBlocker[] = [];
   const rootType = typeOf(root.type_code);
   rootType?.steps
-    .filter((s) => s.required && !root.decisions.some((d) => d.step_code === s.code))
+    .filter(
+      (s) =>
+        s.required && !s.requires_signature && !root.decisions.some((d) => d.step_code === s.code),
+    )
     .forEach((s) =>
       blockers.push({
         kind: 'pending_step',
@@ -89,6 +104,18 @@ export function closingBlockers(root: Ticket, all: Ticket[], typeOf: TypeOf): Cl
         ticket_code: root.code,
         detail: s.name,
         step_code: s.code,
+      }),
+    );
+  signingSteps(rootType)
+    .filter((s) => s.required && !signedDecision(root, s.code))
+    .forEach((s) =>
+      blockers.push({
+        kind: 'signature',
+        ticket_id: root.id,
+        ticket_code: root.code,
+        detail: s.name,
+        step_code: s.code,
+        role_name: s.role_name,
       }),
     );
 
@@ -143,35 +170,55 @@ export function closingBlockMessage(
   return undefined;
 }
 
-/** Decisión de firma utilizable para sellar, o el motivo por el que no hay. */
+/** Firmas utilizables para sellar, o el motivo por el que falta alguna. */
 export function signatureProblemFor(root: Ticket, type: TicketType): string | undefined {
-  if (!type.steps.some((s) => s.code === SIGNATURE_STEP)) return undefined;
-  const decision = root.decisions.find((d) => d.step_code === SIGNATURE_STEP);
-  if (!decision || decision.decision !== 'done') {
-    return 'No se puede cerrar: falta la firma de cierre de quien corresponda.';
-  }
-  if (!decision.signature_url) {
-    return 'No se puede cerrar: quien firma debe cargar su firma en su perfil y volver a firmar.';
+  for (const step of signingSteps(type).filter((s) => s.required)) {
+    const decision = root.decisions.find((d) => d.step_code === step.code);
+    if (!decision || decision.decision !== 'done') {
+      return `No se puede cerrar: falta la firma de ${step.role_name ?? step.name}.`;
+    }
+    if (!decision.signature_url) {
+      return 'No se puede cerrar: quien firma debe cargar su firma en su perfil y volver a firmar.';
+    }
   }
   return undefined;
 }
 
-/** Sello inmutable del cierre. Solo existe si la decisión de firma trae rúbrica. */
+/** Sello inmutable del cierre. Solo existe si todas las firmas obligatorias traen rúbrica. */
 export function buildClosingStamp(
   root: Ticket,
   type: TicketType,
   all: Ticket[],
   typeOf: TypeOf,
 ): ClosingStamp | undefined {
-  const decision = root.decisions.find((d) => d.step_code === SIGNATURE_STEP);
-  const step = type.steps.find((s) => s.code === SIGNATURE_STEP);
-  if (!decision?.signature_url || decision.decision !== 'done') return undefined;
+  const steps = signingSteps(type);
+  const signatures: ClosingSignature[] = steps.flatMap((step) => {
+    const d = signedDecision(root, step.code);
+    return d
+      ? [
+          {
+            step_code: step.code,
+            step_name: step.name,
+            role_name: step.role_name ?? '',
+            user_name: d.decided_by,
+            signed_at: d.decided_at,
+            signature_url: d.signature_url as string,
+          },
+        ]
+      : [];
+  });
+  if (steps.length > 0 && signatures.length < steps.filter((s) => s.required).length) {
+    return undefined;
+  }
+  // El último en firmar es quien deja constancia en el sello de un solo firmante.
+  const last = [...signatures].sort((a, b) => a.signed_at.localeCompare(b.signed_at)).at(-1);
   const members = inExpediente(root, all);
   return {
-    signed_by: decision.decided_by,
-    signed_role: step?.role_name ?? '',
-    signature_url: decision.signature_url,
-    signed_at: decision.decided_at,
+    signed_by: last?.user_name ?? '',
+    signed_role: last?.role_name ?? '',
+    signature_url: last?.signature_url,
+    signed_at: last?.signed_at ?? new Date().toISOString(),
+    signatures,
     totals: computeTotals(
       all.filter((t) => t.parent_id === root.id),
       typeOf,
@@ -209,17 +256,29 @@ function summarize(root: Ticket, all: Ticket[], typeOf: TypeOf): ClosingSummary 
   supports.forEach((s) => byType.set(s.document_type, (byType.get(s.document_type) ?? 0) + 1));
 
   const me = adminState.users.find((u) => u.id === currentAuditActor().id);
-  const step = rootType?.steps.find((s) => s.code === SIGNATURE_STEP);
-  const signed = root.decisions.find((d) => d.step_code === SIGNATURE_STEP);
-  const canSign =
-    Boolean(me && step) &&
-    (me?.role_id === step?.role_id ||
-      effectivePermissionsFor(me?.id ?? '').includes('tickets.decide_any'));
+  const canSignAny =
+    me !== undefined && effectivePermissionsFor(me.id).includes('tickets.decide_any');
+  const signers: ClosingSigner[] = signingSteps(rootType).map((step) => {
+    const d = signedDecision(root, step.code);
+    return {
+      step_code: step.code,
+      step_name: step.name,
+      role_code: adminState.roles.find((r) => r.id === step.role_id)?.code ?? '',
+      role_name: step.role_name ?? '',
+      required: step.required,
+      signed: Boolean(d),
+      signed_by_name: d?.decided_by ?? null,
+      signed_at: d?.decided_at ?? null,
+      can_sign: Boolean(me) && (me?.role_id === step.role_id || canSignAny),
+      has_signature: Boolean(me?.signature_url),
+    };
+  });
 
   return {
     ticket_id: root.id,
     ticket_code: root.code,
     closed: root.status_is_final,
+    stamp: root.closing ?? null,
     progress: progressByRole(members, typeOf),
     expenses,
     totals: computeTotals(children, typeOf),
@@ -237,17 +296,8 @@ function summarize(root: Ticket, all: Ticket[], typeOf: TypeOf): ClosingSummary 
       count,
     })),
     blockers,
-    // La firma se registra en el propio acto de cerrar, así que no cuenta.
-    ready: blockers.every((b) => b.kind === 'pending_step' && b.step_code === SIGNATURE_STEP),
-    signer: {
-      user_name: me?.full_name ?? '',
-      role_name: me?.role_name ?? '',
-      has_signature: Boolean(me?.signature_url),
-      can_sign: canSign,
-      step_code: step?.code,
-      step_role_name: step?.role_name,
-      step_signed: Boolean(signed?.decision === 'done' && signed.signature_url),
-    },
+    ready: blockers.length === 0,
+    signers,
   };
 }
 

@@ -11,6 +11,11 @@ import { Badge } from '@/shared/components/ui/badge';
 import { useT } from '@/shared/hooks/useT';
 import { notify } from '@/shared/utils/notify';
 import { formatDateTime } from '@/shared/utils/formatters';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { useClientList } from '@/shared/hooks/useClientList';
+import { CsvColumn } from '@/shared/utils/csv';
+import { loadRows } from '@/shared/utils/fetchAllPages';
 import { cn } from '@/shared/utils/cn';
 
 /**
@@ -27,6 +32,31 @@ export function ReviewPage() {
   const [isSaving, setSaving] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set());
 
+  // La cola se revisa de a un comprobante: search y filtros recortan la cola, no hay páginas.
+  const list = useClientList<PendingReview>({
+    items,
+    searchText: (r) => `${r.ticket_code} ${r.ticket_title} ${r.type_name} ${r.file.name} ${r.parent_code ?? ''}`,
+    filters: { type: (r, v) => r.type_name === v },
+  });
+  const queue = list.filtered;
+  const typeNames = [...new Set(items.map((r) => r.type_name))].sort();
+  const filters: FilterDef[] = [
+    {
+      key: 'type',
+      label: t('listData.ticketType'),
+      type: 'select',
+      options: typeNames.map((n) => ({ value: n, label: n })),
+    },
+  ];
+  const columns: CsvColumn<PendingReview>[] = [
+    { header: t('listData.csv.ticket'), value: (r) => r.ticket_code },
+    { header: t('listData.csv.title'), value: (r) => r.ticket_title },
+    { header: t('listData.csv.type'), value: (r) => r.type_name },
+    { header: t('listData.csv.file'), value: (r) => r.file.name },
+    { header: t('listData.csv.uploadedBy'), value: (r) => r.file.uploaded_by },
+    { header: t('listData.csv.uploadedAt'), value: (r) => formatDateTime(r.file.uploaded_at) },
+  ];
+
   const load = useCallback(async () => {
     setLoading(true);
     const res = await getPendingReviews({ limit: 50 });
@@ -39,7 +69,7 @@ export function ReviewPage() {
     void load();
   }, [load]);
 
-  const review = items[current];
+  const review = queue[current];
 
   // Al cambiar de comprobante se parte de lo leído, no de lo tipeado antes.
   useEffect(() => {
@@ -87,12 +117,45 @@ export function ReviewPage() {
           <p className="text-sm text-muted-foreground">{t('review.subtitle')}</p>
         </div>
         <span className="text-sm text-muted-foreground">
-          <span className="data font-semibold text-foreground">{items.length}</span>{' '}
+          <span className="data font-semibold text-foreground">{queue.length}</span>{' '}
           {t('review.pending')}
         </span>
       </header>
 
-      {!review && (
+      {items.length > 0 && (
+        <ListToolbar
+          search={list.search}
+          onSearch={(v) => {
+            list.setSearch(v);
+            setCurrent(0);
+          }}
+          searchPlaceholder={t('listData.searchReview')}
+          filters={filters}
+          values={list.values}
+          onFilter={(k, v) => {
+            list.setFilter(k, v);
+            setCurrent(0);
+          }}
+          onClear={() => {
+            list.clear();
+            setCurrent(0);
+          }}
+          actions={
+            <ExportButton
+              filename={t('review.title')}
+              columns={columns}
+              load={loadRows(queue)}
+              disabled={queue.length === 0}
+            />
+          }
+        />
+      )}
+
+      {!review && items.length > 0 && (
+        <Card className="p-8 text-center text-sm text-muted-foreground">{t('list.noResults')}</Card>
+      )}
+
+      {!review && items.length === 0 && (
         <Card className="flex flex-col items-center gap-2 p-10 text-center">
           <Check className="h-8 w-8 text-success" />
           <p className="font-medium">{t('review.empty')}</p>
@@ -193,8 +256,8 @@ export function ReviewPage() {
                 <Check className="h-4 w-4" />
                 {t('review.approve')}
               </Button>
-              {items.length > 1 && (
-                <Button variant="outline" onClick={() => setCurrent((c) => (c + 1) % items.length)}>
+              {queue.length > 1 && (
+                <Button variant="outline" onClick={() => setCurrent((c) => (c + 1) % queue.length)}>
                   {t('review.skip')}
                 </Button>
               )}

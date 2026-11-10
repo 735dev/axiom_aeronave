@@ -26,6 +26,8 @@ export const FIELD_ROLES: FieldRole[] = [
   'currency',
   'accounting_date',
   'aircraft',
+  'aircraft_brand',
+  'aircraft_model',
   'item',
   'quantity',
   'unit',
@@ -40,6 +42,8 @@ const CATALOG_KEYS: CatalogKey[] = [
   'operation_scopes',
   'aircraft_statuses',
   'aircrafts',
+  'aircraft_brands',
+  'aircraft_models',
   'airports',
   'locations',
 ];

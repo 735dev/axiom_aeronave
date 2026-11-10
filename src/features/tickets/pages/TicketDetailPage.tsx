@@ -48,6 +48,7 @@ export function TicketDetailPage() {
   const { canForType } = useTypeAccess();
   const [comment, setComment] = useState('');
   const [isSubmitting, setSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string> | undefined>();
   const [creatingChild, setCreatingChild] = useState(false);
 
   if (isLoading || !ticket) {
@@ -66,10 +67,12 @@ export function TicketDetailPage() {
     const res = await updateTicket(ticket.id, { payload: values });
     setSubmitting(false);
     if (res.ok) {
+      setFieldErrors(undefined);
       notify.toast.success(t('tickets.savedOk'));
       void reload();
       return;
     }
+    setFieldErrors(res.fieldErrors ? { ...res.fieldErrors } : undefined);
     notify.fromApiError(res);
   };
 
@@ -197,7 +200,7 @@ export function TicketDetailPage() {
       )}
 
       {ticket.type_is_root && (
-        <ClosingPanel ticket={ticket} type={type} canEdit={canEdit} onClosed={reload} />
+        <ClosingPanel ticket={ticket} type={type} canEdit={canEdit} onChanged={reload} />
       )}
 
       {ticket.type_is_root && (
@@ -311,6 +314,7 @@ export function TicketDetailPage() {
               defaultValues={ticket.payload}
               isSubmitting={isSubmitting}
               readOnly={!canEdit}
+              serverErrors={fieldErrors}
               onSubmit={onSave}
             />
           ) : (

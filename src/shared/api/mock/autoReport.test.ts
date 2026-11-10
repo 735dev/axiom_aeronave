@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { USERS, loginAs } from '@/test/mockApi';
+import { SIGNING_STEPS, USERS, loginAs } from '@/test/mockApi';
 
 const newOp = (s: ReturnType<typeof loginAs>) =>
   s.post('/tickets/', {
@@ -28,7 +28,7 @@ describe('reporte técnico automático por operación', () => {
   it('bloquea el cierre de la operación mientras no se resuelva', () => {
     const s = loginAs(USERS.superuser);
     const op = newOp(s);
-    ['planning', 'requirements', 'ground', 'technical', 'signature'].forEach((c) =>
+    ['planning', 'requirements', 'ground', 'technical', ...SIGNING_STEPS].forEach((c) =>
       s.post(`/tickets/${op.id}/decisions/`, { step_code: c, decision: 'done' }),
     );
     const r = s.patch(`/tickets/${op.id}/`, { status_code: 'closed' });
@@ -64,7 +64,7 @@ describe('reporte técnico automático por operación', () => {
     expect(s.patch(`/tickets/${report.id}/`, { status_code: 'no_findings' }).status).toBe(200);
     // Quien firma el cierre necesita su rúbrica cargada.
     s.patch('/auth/me/signature/', { signature_url: 'data:image/png;base64,iVBORw0KGgo=' });
-    ['planning', 'requirements', 'ground', 'technical', 'signature'].forEach((c) =>
+    ['planning', 'requirements', 'ground', 'technical', ...SIGNING_STEPS].forEach((c) =>
       s.post(`/tickets/${op.id}/decisions/`, { step_code: c, decision: 'done' }),
     );
     expect(s.patch(`/tickets/${op.id}/`, { status_code: 'closed' }).status).toBe(200);

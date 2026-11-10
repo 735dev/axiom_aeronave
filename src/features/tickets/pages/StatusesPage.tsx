@@ -3,12 +3,18 @@ import { Flag, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useTicketTypes } from '../hooks/useTickets';
 import { updateTicketType } from '../api/ticketsApi';
 import { StatusDef, TicketType } from '../types/ticket.types';
-import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Select } from '@/shared/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { ClientPagination } from '@/shared/components/list/ClientPagination';
+import { DataTable, Column } from '@/shared/components/list/DataTable';
+import { useClientList } from '@/shared/hooks/useClientList';
+import { CsvColumn } from '@/shared/utils/csv';
+import { loadRows } from '@/shared/utils/fetchAllPages';
 import { useT } from '@/shared/hooks/useT';
 import { notify } from '@/shared/utils/notify';
 
@@ -20,6 +26,48 @@ export function StatusesPanel() {
   const [editing, setEditing] = useState<TicketType | null>(null);
   const [draft, setDraft] = useState<StatusDef[]>([]);
   const [isSubmitting, setSubmitting] = useState(false);
+
+  const list = useClientList<TicketType>({
+    items: types,
+    searchText: (x) => `${x.name} ${x.statuses.map((st) => st.name).join(' ')}`,
+    filters: {
+      kind: (x, v) => (v === 'root') === x.is_root,
+      color: (x, v) => x.statuses.some((st) => st.color === v),
+    },
+  });
+
+  const filters: FilterDef[] = [
+    {
+      key: 'kind',
+      label: t('listData.kind'),
+      type: 'select',
+      options: [
+        { value: 'root', label: t('listData.kindRoot') },
+        { value: 'child', label: t('listData.kindChild') },
+      ],
+    },
+    {
+      key: 'color',
+      label: t('listData.csv.color'),
+      type: 'select',
+      options: COLORS.map((c) => ({ value: c, label: t(`ticketTypes.color.${c}`) })),
+    },
+  ];
+
+  /** Una fila por estado, con el tipo al que pertenece. */
+  const statusRows = list.filtered.flatMap((type) =>
+    [...type.statuses]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((status) => ({ type, status })),
+  );
+  const csvColumns: CsvColumn<{ type: TicketType; status: StatusDef }>[] = [
+    { header: t('listData.csv.type'), value: (r) => r.type.name },
+    { header: t('listData.csv.status'), value: (r) => r.status.name },
+    { header: t('listData.csv.color'), value: (r) => t(`ticketTypes.color.${r.status.color}`) },
+    { header: t('listData.csv.initial'), value: (r) => t(r.status.is_initial ? 'common.yes' : 'common.no') },
+    { header: t('listData.csv.final'), value: (r) => t(r.status.is_final ? 'common.yes' : 'common.no') },
+    { header: t('listData.csv.order'), value: (r) => r.status.sort_order },
+  ];
 
   const open = (type: TicketType) => {
     setEditing(type);
@@ -47,6 +95,37 @@ export function StatusesPanel() {
   const set = (index: number, patch: Partial<StatusDef>) =>
     setDraft((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
 
+  const tableColumns: Column<TicketType>[] = [
+    {
+      key: 'type',
+      header: 'listData.csv.type',
+      primary: true,
+      cell: (type) => (
+        <p className="flex flex-wrap items-center gap-2 font-medium">
+          {type.name}
+          {type.is_root && <Badge variant="warning">{t('ticketTypes.rootBadge')}</Badge>}
+        </p>
+      ),
+    },
+    {
+      key: 'statuses',
+      header: 'listData.csv.status',
+      cell: (type) => (
+        <div className="flex flex-wrap gap-2 md:justify-start">
+          {[...type.statuses]
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((status) => (
+              <Badge key={status.id} variant={status.color}>
+                {status.name}
+                {status.is_initial && ` · ${t('statuses.initialShort')}`}
+                {status.is_final && ` · ${t('statuses.finalShort')}`}
+              </Badge>
+            ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
       <div className="min-w-0">
@@ -56,36 +135,37 @@ export function StatusesPanel() {
         </p>
         <p className="mt-0.5 text-sm text-muted-foreground">{t('statuses.subtitle')}</p>
       </div>
-      {isLoading && <p className="text-sm text-muted-foreground">{t('common.loading')}</p>}
+      <ListToolbar
+        search={list.search}
+        onSearch={list.setSearch}
+        searchPlaceholder={t('listData.searchStatuses')}
+        filters={filters}
+        values={list.values}
+        onFilter={list.setFilter}
+        onClear={list.clear}
+        actions={
+          <ExportButton
+            filename={t('statuses.title')}
+            columns={csvColumns}
+            load={loadRows(statusRows)}
+            disabled={statusRows.length === 0}
+          />
+        }
+      />
+      <DataTable
+        columns={tableColumns}
+        rows={list.rows}
+        rowKey={(type) => type.id}
+        isLoading={isLoading}
+        emptyMessage={types.length > 0 ? 'list.noResults' : 'common.empty'}
+        actions={(type) => (
+          <Button size="sm" variant="outline" onClick={() => open(type)}>
+            {t('statuses.edit')}
+          </Button>
+        )}
+      />
 
-      <div className="space-y-3">
-        {types.map((type) => (
-          <Card key={type.id} className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="flex flex-wrap items-center gap-2 font-medium">
-                  {type.name}
-                  {type.is_root && <Badge variant="warning">{t('ticketTypes.rootBadge')}</Badge>}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[...type.statuses]
-                    .sort((a, b) => a.sort_order - b.sort_order)
-                    .map((status) => (
-                      <Badge key={status.id} variant={status.color}>
-                        {status.name}
-                        {status.is_initial && ` · ${t('statuses.initialShort')}`}
-                        {status.is_final && ` · ${t('statuses.finalShort')}`}
-                      </Badge>
-                    ))}
-                </div>
-              </div>
-              <Button size="sm" variant="outline" className="shrink-0" onClick={() => open(type)}>
-                {t('statuses.edit')}
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <ClientPagination list={list} />
 
       <Dialog open={Boolean(editing)} onOpenChange={(v) => !v && setEditing(null)}>
         <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">

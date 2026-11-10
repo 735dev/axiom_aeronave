@@ -6,6 +6,8 @@ export type CatalogKey =
   | 'operation_scopes'
   | 'aircraft_statuses'
   | 'aircrafts'
+  | 'aircraft_brands'
+  | 'aircraft_models'
   | 'airports'
   | 'locations';
 

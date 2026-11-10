@@ -19,6 +19,10 @@ export interface TicketFilterState {
   type_code?: string;
   assigned_role_id?: string;
   open?: boolean;
+  aircraft?: string;
+  /** Rango de creación, `YYYY-MM-DD`. */
+  from?: string;
+  to?: string;
 }
 
 /**
@@ -39,6 +43,9 @@ export function useTickets(fixed: TicketsQuery = {}) {
       type_code: params.get('tipo') ?? undefined,
       assigned_role_id: params.get('rol') ?? undefined,
       open: open === null ? undefined : open === 'true',
+      aircraft: params.get('aeronave') ?? undefined,
+      from: params.get('desde') ?? undefined,
+      to: params.get('hasta') ?? undefined,
     };
   }, [params]);
 
@@ -55,6 +62,9 @@ export function useTickets(fixed: TicketsQuery = {}) {
           write('tipo', next.type_code);
           write('rol', next.assigned_role_id);
           write('abierto', next.open === undefined ? undefined : String(next.open));
+          write('aeronave', next.aircraft);
+          write('desde', next.from);
+          write('hasta', next.to);
           return draft;
         },
         { replace: true },
@@ -92,10 +102,16 @@ export function useTickets(fixed: TicketsQuery = {}) {
   const pagination = usePagination<Ticket, TicketsQuery>({
     fetcher: getTickets,
     initialParams,
-    initialLimit: 20,
+    initialLimit: 25,
   });
 
-  return { ...pagination, search, setSearch, filters, setFilters };
+  const clear = useCallback(() => {
+    setSearchValue('');
+    setFilters({});
+  }, [setFilters]);
+
+  // `query` = lo que se consulta sin página ni límite; es lo que se exporta.
+  return { ...pagination, search, setSearch, filters, setFilters, clear, query: initialParams };
 }
 
 export function useTicketTypes(params: { is_active?: boolean; is_root?: boolean } = {}) {

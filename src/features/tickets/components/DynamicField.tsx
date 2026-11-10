@@ -1,5 +1,7 @@
-import { Controller, useFormContext } from 'react-hook-form';
+import { useEffect, useRef } from 'react';
+import { Controller, useFormContext, useWatch } from 'react-hook-form';
 import { FieldDef } from '../types/ticket.types';
+import { filterDependentOptions, isValidOption } from '../utils/aircraftAutofill';
 import { useCatalogOptions } from '@/features/catalogs/hooks/useCatalog';
 import { FormInput } from '@/shared/components/form/FormInput';
 import { FormTextarea } from '@/shared/components/form/FormTextarea';
@@ -17,9 +19,27 @@ import { cn } from '@/shared/utils/cn';
 export function DynamicField({ field, locked }: { field: FieldDef; locked?: boolean }) {
   const t = useT();
   const { can } = useCan();
-  const { control } = useFormContext();
+  const { control, getValues, setValue } = useFormContext();
 
-  const catalogOptions = useCatalogOptions(field.catalog ?? 'units');
+  const allCatalogOptions = useCatalogOptions(field.catalog);
+  // Las opciones de un campo dependiente salen del valor de su padre.
+  const parentValue = useWatch({ control, name: field.depends_on ?? field.key, disabled: !field.depends_on });
+  const catalogOptions = field.depends_on
+    ? filterDependentOptions(allCatalogOptions, parentValue)
+    : allCatalogOptions;
+
+  // Si la persona cambia el padre y lo ya elegido deja de corresponder, se limpia.
+  // Al abrir un expediente existente no se toca: solo reacciona a un cambio real.
+  const lastParent = useRef(parentValue);
+  useEffect(() => {
+    if (!field.depends_on || lastParent.current === parentValue) return;
+    lastParent.current = parentValue;
+    const current = getValues(field.key);
+    if (current && catalogOptions.length > 0 && !isValidOption(catalogOptions, current)) {
+      setValue(field.key, '', { shouldDirty: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentValue, catalogOptions.length]);
   const className = cn(field.width === 'half' ? 'sm:col-span-1' : 'sm:col-span-2');
 
   // Permisos por campo: sin el de ver, el campo no existe para este usuario;

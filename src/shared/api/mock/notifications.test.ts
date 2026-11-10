@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PNG, findTicket, loginAs } from '@/test/mockApi';
+import { PNG, SIGNING_STEPS, findTicket, loginAs } from '@/test/mockApi';
 import { routeMockRequest } from './router';
 import { notify } from './notifications';
 
@@ -61,7 +61,7 @@ const child = (s: Sess, parent: string, type_code: string, extra: Record<string,
 const signAllSteps = (s: Sess, op: any) => {
   // El cierre firmado exige la rúbrica de quien firma: se carga una antes.
   s.patch('/auth/me/signature/', { signature_url: 'data:image/png;base64,iVBORw0KGgo=' });
-  ['planning', 'requirements', 'ground', 'technical', 'signature'].forEach((step_code) =>
+  ['planning', 'requirements', 'ground', 'technical', ...SIGNING_STEPS].forEach((step_code) =>
     s.post(`/tickets/${op.id}/decisions/`, { step_code, decision: 'done' }),
   );
   // El reporte técnico que el sistema abre solo también bloquea el cierre.

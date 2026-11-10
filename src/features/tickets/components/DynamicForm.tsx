@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { buildDynamicSchema, DynamicValues } from '../schemas/dynamicSchema';
 import { Extraction, FieldDef } from '../types/ticket.types';
 import { DynamicField } from './DynamicField';
+import { resolveAircraftAutofill } from '../utils/aircraftAutofill';
+import { useCatalogOptions } from '@/features/catalogs/hooks/useCatalog';
 import { Button } from '@/shared/components/ui/button';
 import { useT } from '@/shared/hooks/useT';
 import { notify } from '@/shared/utils/notify';
@@ -21,6 +23,8 @@ interface Props {
   readOnly?: boolean;
   /** Lo que el sistema leyó del comprobante: se propone, nunca se da por bueno. */
   proposal?: Extraction;
+  /** Errores por campo que devolvió el servidor al guardar (clave del campo → mensaje). */
+  serverErrors?: Record<string, string>;
 }
 
 /**
@@ -43,6 +47,7 @@ export function DynamicForm({
   children,
   readOnly,
   proposal,
+  serverErrors,
 }: Props) {
   const t = useT();
   const schema = useMemo(() => buildDynamicSchema(fields.filter(isFormField)), [fields]);
@@ -64,6 +69,43 @@ export function DynamicForm({
     resolver: zodResolver(schema),
     defaultValues: initial,
   });
+
+  // Marca y modelo siguen a la matrícula (por rol de campo, sin claves a mano),
+  // pero solo cuando la persona la cambia: un expediente abierto no se reescribe.
+  const aircraftField = fields.find((f) => f.role === 'aircraft');
+  const aircrafts = useCatalogOptions(aircraftField?.catalog);
+  const models = useCatalogOptions(fields.find((f) => f.role === 'aircraft_model')?.catalog);
+  const aircraftValue = useWatch({
+    control: methods.control,
+    name: aircraftField?.key ?? '',
+    disabled: !aircraftField,
+  });
+  const lastAircraft = useRef(aircraftValue);
+  const pendingAircraft = useRef(false);
+  useEffect(() => {
+    if (lastAircraft.current !== aircraftValue) {
+      lastAircraft.current = aircraftValue;
+      pendingAircraft.current = Boolean(aircraftValue);
+    }
+    if (!pendingAircraft.current) return;
+    // Los catálogos pueden llegar después del clic: se reintenta cuando lleguen.
+    if (aircrafts.length === 0 || models.length === 0) return;
+    pendingAircraft.current = false;
+    const proposal = resolveAircraftAutofill({ fields, aircraftValue, aircrafts, models });
+    if (!proposal) return;
+    Object.entries(proposal).forEach(([key, value]) =>
+      methods.setValue(key, value, { shouldDirty: true, shouldValidate: false }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aircraftValue, aircrafts, models]);
+
+  useEffect(() => {
+    if (!serverErrors) return;
+    Object.entries(serverErrors).forEach(([key, message]) => {
+      if (key in methods.getValues()) methods.setError(key, { type: 'server', message });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverErrors]);
 
   // Confirmadas = la persona las aceptó o las corrigió. Las de baja confianza
   // no dejan guardar hasta entonces: nada leído por máquina entra sin que

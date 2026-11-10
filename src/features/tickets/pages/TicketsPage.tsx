@@ -4,6 +4,13 @@ import { Plus } from 'lucide-react';
 import { useTickets, useTicketTypes } from '../hooks/useTickets';
 import { TicketsList } from '../components/TicketsList';
 import { TicketFilters } from '../components/TicketFilters';
+import { getTickets } from '../api/ticketsApi';
+import { Ticket } from '../types/ticket.types';
+import { useCatalogOptions } from '@/features/catalogs/hooks/useCatalog';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { CsvColumn } from '@/shared/utils/csv';
+import { fetchAllPages } from '@/shared/utils/fetchAllPages';
+import { formatDate } from '@/shared/utils/formatters';
 import { NewTicketDialog } from '../components/NewTicketDialog';
 import { PaginatedComplete } from '@/shared/components/pagination/PaginatedComplete';
 import { Button } from '@/shared/components/ui/button';
@@ -56,12 +63,28 @@ export function TicketsPage({ initialView = 'work' }: Props) {
 
   const tickets = useTickets(fixed);
   const { types: allTypes } = useTicketTypes({ is_active: true });
+  const aircraftOptions = useCatalogOptions('aircrafts');
   const { canForType } = useTypeAccess();
   const { canScoped } = useCan();
   const types = allTypes.filter((type) => canForType('view', type.code));
   const creatableTypes = (view === 'operations' ? types.filter((x) => x.is_root) : types).filter(
     (x) => canForType('create', x.code),
   );
+
+  const exportColumns: CsvColumn<Ticket>[] = [
+    { header: t('list.col.code'), value: (x) => x.code },
+    { header: t('list.col.control'), value: (x) => x.control_number },
+    { header: t('list.col.type'), value: (x) => x.type_name },
+    { header: t('list.col.title'), value: (x) => x.title },
+    { header: t('list.col.status'), value: (x) => x.status_name },
+    { header: t('list.col.parent'), value: (x) => x.parent_code },
+    { header: t('list.col.assigned'), value: (x) => x.assigned_user_name ?? x.assigned_role_name },
+    { header: t('list.col.amount'), value: (x) => x.money?.amount },
+    { header: t('list.col.currency'), value: (x) => x.money?.currency },
+    { header: t('list.col.created'), value: (x) => formatDate(x.created_at) },
+    { header: t('list.col.due'), value: (x) => (x.due_at ? formatDate(x.due_at) : '') },
+    { header: t('list.col.closed'), value: (x) => (x.closed_at ? formatDate(x.closed_at) : '') },
+  ];
 
   const tab = (value: View, label: string) => (
     <button
@@ -104,6 +127,16 @@ export function TicketsPage({ initialView = 'work' }: Props) {
         filters={tickets.filters}
         onSearch={tickets.setSearch}
         onChange={tickets.setFilters}
+        onClear={tickets.clear}
+        aircraftOptions={aircraftOptions}
+        actions={
+          <ExportButton
+            filename={view === 'operations' ? 'operaciones' : 'tickets'}
+            columns={exportColumns}
+            disabled={tickets.total === 0}
+            load={() => fetchAllPages(getTickets, tickets.query)}
+          />
+        }
       />
 
       <TicketsList items={tickets.items} isLoading={tickets.isLoading} />
@@ -114,6 +147,7 @@ export function TicketsPage({ initialView = 'work' }: Props) {
         total={tickets.total}
         links={tickets.links}
         onPageChange={tickets.setPage}
+        onLimitChange={tickets.setLimit}
       />
 
       <NewTicketDialog

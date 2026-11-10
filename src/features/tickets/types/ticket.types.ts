@@ -29,7 +29,10 @@ export type FieldRole =
   /** Proveedor que emitió el comprobante: se prellena desde la lectura. */
   | 'supplier'
   /** Matrícula que da nombre al expediente: `YV2323-001-26`. */
-  | 'aircraft';
+  | 'aircraft'
+  /** Marca y modelo de la aeronave: se proponen al elegir la matrícula. */
+  | 'aircraft_brand'
+  | 'aircraft_model';
 
 export interface FieldOption {
   value: string;
@@ -47,6 +50,8 @@ export interface FieldDef {
   help?: string;
   options?: FieldOption[];
   catalog?: CatalogKey;
+  /** Clave del campo padre: sus opciones son las del catálogo cuyo `extra` es el valor del padre. */
+  depends_on?: string;
   /** Significado del campo para totales y analítica. Vacío = solo dato. */
   role?: FieldRole;
   /** Sin este permiso el campo no se muestra. Vacío = visible para todos. */
@@ -84,6 +89,8 @@ export interface StepDef {
   /** Área operativa responsable cuando no coincide con un rol de acceso. */
   responsible_area?: string;
   required: boolean;
+  /** Quien decide este paso estampa su firma; el cierre exige todas las firmas. */
+  requires_signature?: boolean;
   sort_order: number;
 }
 
@@ -342,16 +349,45 @@ export interface ExpenseTotals {
  * qué rúbrica y cuánto se gastó entonces. Después de cerrada, nada lo cambia.
  */
 export interface ClosingStamp {
+  /** Cierres anteriores a las firmas múltiples: un solo firmante. */
   signed_by: string;
   signed_role: string;
   /** Solo viaja en el resumen de cierre; el ticket trae `has_signature`. */
   signature_url?: string;
   has_signature?: boolean;
   signed_at: string;
+  /** Firmas selladas, una por paso firmable. Vacío en cierres anteriores. Solo viaja en el resumen. */
+  signatures?: ClosingSignature[];
   totals: ExpenseTotals;
   files_count: number;
   /** Carpeta del expediente en Blackbox. */
   folder: string;
+}
+
+/** Una firma sellada en el cierre (con la imagen, solo en el resumen de cierre). */
+export interface ClosingSignature {
+  step_code: string;
+  step_name: string;
+  role_name: string;
+  user_name: string;
+  signed_at: string;
+  signature_url: string;
+}
+
+/** Un paso firmable del cierre y su estado, tal como lo ve quien consulta. */
+export interface ClosingSigner {
+  step_code: string;
+  step_name: string;
+  role_code: string;
+  role_name: string;
+  required: boolean;
+  signed: boolean;
+  signed_by_name: string | null;
+  signed_at: string | null;
+  /** El usuario puede firmar este paso: tiene su rol o `tickets.decide_any`. */
+  can_sign: boolean;
+  /** El usuario tiene su rúbrica cargada en el perfil. */
+  has_signature: boolean;
 }
 
 export interface ClosingRoleProgress {
@@ -392,7 +428,8 @@ export type ClosingBlockerKind =
   | 'pending_step'
   | 'unresolved_child'
   | 'expense_without_support'
-  | 'receipt_awaiting_validation';
+  | 'receipt_awaiting_validation'
+  | 'signature';
 
 export interface ClosingBlocker {
   kind: ClosingBlockerKind;
@@ -401,6 +438,8 @@ export interface ClosingBlocker {
   /** Paso pendiente (`pending_step`) o archivo (`receipt_awaiting_validation`). */
   detail?: string;
   step_code?: string;
+  /** Rol que debe firmar (`signature`). */
+  role_name?: string;
 }
 
 export interface ClosingMoneyBlock {
@@ -422,17 +461,8 @@ export interface ClosingSummary {
   blockers: ClosingBlocker[];
   /** Sello inmutable del cierre, con la imagen de la firma. Nulo mientras esté abierta. */
   stamp?: ClosingStamp | null;
-  /** Todo lo que impide cerrar está resuelto, salvo la firma, que se pone al cerrar. */
+  /** Nada impide cerrar: todo resuelto y todas las firmas puestas. */
   ready: boolean;
-  signer: {
-    user_name: string;
-    role_name: string;
-    has_signature: boolean;
-    /** El usuario puede firmar el paso: tiene su rol o `tickets.decide_any`. */
-    can_sign: boolean;
-    step_code?: string;
-    step_role_name?: string;
-    /** La firma ya registrada en el paso trae rúbrica. */
-    step_signed: boolean;
-  };
+  /** Pasos firmables del cierre, en orden. */
+  signers: ClosingSigner[];
 }

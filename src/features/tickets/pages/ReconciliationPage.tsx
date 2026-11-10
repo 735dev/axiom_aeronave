@@ -8,7 +8,7 @@ import {
   getReconciliation,
   recordReconciliationExport,
 } from '../api/reconciliationApi';
-import { ClosedPeriod, ReconciliationReport, ReconciliationRowState } from '../types/reconciliation.types';
+import { ClosedPeriod, ReconciliationReport, ReconciliationRow, ReconciliationRowState } from '../types/reconciliation.types';
 import { ReconciliationDifference } from '../components/ReconciliationDifference';
 import { buildReconciliationCsv, downloadCsv } from '../utils/reconciliationCsv';
 import { Card } from '@/shared/components/ui/card';
@@ -22,12 +22,18 @@ import { useT } from '@/shared/hooks/useT';
 import { useAppSelector } from '@/shared/store/hooks';
 import { notify } from '@/shared/utils/notify';
 import { formatDateTime } from '@/shared/utils/formatters';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ClientPagination } from '@/shared/components/list/ClientPagination';
+import { DataTable, Column } from '@/shared/components/list/DataTable';
+import { useClientList } from '@/shared/hooks/useClientList';
 
 const ROW_VARIANT: Record<ReconciliationRowState, 'success' | 'danger' | 'default'> = {
   reconciled: 'success',
   difference: 'danger',
   discarded: 'default',
 };
+
+const EMPTY_ROWS: ReconciliationRow[] = [];
 
 function money(value: number): string {
   return new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(value);
@@ -69,6 +75,34 @@ export function ReconciliationPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const rowsList = useClientList<ReconciliationRow>({
+    items: report?.rows ?? EMPTY_ROWS,
+    searchText: (r) => `${r.code} ${r.title} ${r.operation_code ?? ''}`,
+    filters: {
+      state: (r, v) => r.state === v,
+      currency: (r, v) => r.currency === v,
+    },
+  });
+  const rowFilters: FilterDef[] = [
+    {
+      key: 'state',
+      label: t('listData.rowState'),
+      type: 'select',
+      options: (['reconciled', 'difference', 'discarded'] as const).map((s) => ({
+        value: s,
+        label: t(`reconciliation.state.${s}`),
+      })),
+    },
+    {
+      key: 'currency',
+      label: t('listData.currency'),
+      type: 'select',
+      options: [...new Set((report?.rows ?? []).map((r) => r.currency))]
+        .sort()
+        .map((c) => ({ value: c, label: c })),
+    },
+  ];
 
   const closed = report?.close ?? null;
   const base = report?.base_currency ?? 'USD';
@@ -136,6 +170,40 @@ export function ReconciliationPage() {
       </p>
     </div>
   );
+
+  const rowColumns: Column<ReconciliationRow>[] = [
+    {
+      key: 'code',
+      header: 'listData.csv.code',
+      primary: true,
+      cell: (r) => (
+        <Link to={`/tickets/${r.ticket_id}`} className="data text-sm text-primary hover:underline">
+          {r.code}
+        </Link>
+      ),
+    },
+    {
+      key: 'state',
+      header: 'listData.csv.status',
+      cell: (r) => <Badge variant={ROW_VARIANT[r.state]}>{t(`reconciliation.state.${r.state}`)}</Badge>,
+    },
+    { key: 'title', header: 'listData.csv.title', cell: (r) => <span className="text-sm text-muted-foreground">{r.title}</span> },
+    {
+      key: 'operation',
+      header: 'listData.csv.operation',
+      cell: (r) => (r.operation_code ? <span className="data text-xs text-muted-foreground">{r.operation_code}</span> : '—'),
+    },
+    {
+      key: 'amount',
+      header: 'listData.csv.amount',
+      align: 'right',
+      cell: (r) => (
+        <span className="data text-sm">
+          {money(r.amount)} {r.currency}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <section className="space-y-5 p-4 md:p-6">
@@ -280,30 +348,28 @@ export function ReconciliationPage() {
                 {t('reconciliation.close.blocked', { count: report.open_differences })}
               </p>
             )}
-            <ul className="divide-y divide-border">
-              {report.rows.map((r) => (
-                <li key={r.ticket_id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                  <Badge variant={ROW_VARIANT[r.state]}>
-                    {t(`reconciliation.state.${r.state}`)}
-                  </Badge>
-                  <Link
-                    to={`/tickets/${r.ticket_id}`}
-                    className="data text-sm text-primary hover:underline"
-                  >
-                    {r.code}
-                  </Link>
-                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                    {r.title}
-                  </span>
-                  {r.operation_code && (
-                    <span className="data text-xs text-muted-foreground">{r.operation_code}</span>
-                  )}
-                  <span className="data text-sm">
-                    {money(r.amount)} {r.currency}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="border-b border-border px-4 py-3">
+              <ListToolbar
+                search={rowsList.search}
+                onSearch={rowsList.setSearch}
+                searchPlaceholder={t('listData.searchReconciliation')}
+                filters={rowFilters}
+                values={rowsList.values}
+                onFilter={rowsList.setFilter}
+                onClear={rowsList.clear}
+              />
+            </div>
+            <div className="p-4">
+              <DataTable
+                columns={rowColumns}
+                rows={rowsList.rows}
+                rowKey={(r) => r.ticket_id}
+                emptyMessage="list.noResults"
+              />
+            </div>
+            <div className="px-4 py-3">
+              <ClientPagination list={rowsList} />
+            </div>
           </Card>
 
           {discardedCount > 0 && (

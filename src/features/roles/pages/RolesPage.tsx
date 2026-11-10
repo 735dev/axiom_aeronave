@@ -2,15 +2,19 @@ import { useState } from 'react';
 import { Plus, ShieldCheck, Trash2, Users } from 'lucide-react';
 import { useRoles } from '../hooks/useRoles';
 import { RoleForm } from '../components/RoleForm';
-import { deleteRole } from '../api/rolesApi';
+import { deleteRole, getRoles } from '../api/rolesApi';
 import { Role } from '../types/role.types';
-import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Input } from '@/shared/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { PaginatedComplete } from '@/shared/components/pagination/PaginatedComplete';
+import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { CsvColumn } from '@/shared/utils/csv';
+import { fetchAllPages } from '@/shared/utils/fetchAllPages';
 import { Can } from '@/shared/components/auth/Can';
+import { useCan } from '@/shared/hooks/useCan';
+import { Column, DataTable } from '@/shared/components/list/DataTable';
 import { PERMISSIONS } from '@/shared/auth/permissions';
 import { AdminTabs } from '@/shared/components/layout/AdminTabs';
 import { useT } from '@/shared/hooks/useT';
@@ -19,6 +23,38 @@ import { notify } from '@/shared/utils/notify';
 export function RolesPage() {
   const t = useT();
   const roles = useRoles();
+  const { can } = useCan();
+
+  const filterDefs: FilterDef[] = [
+    {
+      key: 'is_active',
+      label: t('list.filter.status'),
+      type: 'select',
+      options: [
+        { value: 'true', label: t('list.filter.active') },
+        { value: 'false', label: t('list.filter.inactive') },
+      ],
+    },
+    {
+      key: 'is_system',
+      label: t('list.filter.scope'),
+      type: 'select',
+      options: [
+        { value: 'true', label: t('list.filter.system') },
+        { value: 'false', label: t('list.filter.custom') },
+      ],
+    },
+  ];
+
+  const exportColumns: CsvColumn<Role>[] = [
+    { header: t('list.col.name'), value: (r) => r.name },
+    { header: t('list.col.code'), value: (r) => r.code },
+    { header: t('list.col.description'), value: (r) => r.description },
+    { header: t('list.col.system'), value: (r) => (r.is_system ? t('common.yes') : t('common.no')) },
+    { header: t('list.col.status'), value: (r) => (r.is_active ? t('list.filter.active') : t('list.filter.inactive')) },
+    { header: t('list.col.users'), value: (r) => r.users_count },
+    { header: t('list.col.permissions'), value: (r) => r.permissions.join(' ') },
+  ];
   const [editing, setEditing] = useState<Role | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -34,6 +70,56 @@ export function RolesPage() {
     });
   };
 
+  const columns: Column<Role>[] = [
+    {
+      key: 'name',
+      header: 'list.col.name',
+      primary: true,
+      cell: (role) => (
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 font-medium">
+            {role.name}
+            {role.is_system && <Badge variant="info">{t('roles.system')}</Badge>}
+          </p>
+          {role.description && <p className="mt-0.5 text-sm text-muted-foreground">{role.description}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'permissions',
+      header: 'list.col.permissions',
+      cell: (role) => (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          {role.permissions.length} {t('roles.permissionsShort')}
+        </span>
+      ),
+    },
+    {
+      key: 'users',
+      header: 'list.col.users',
+      cell: (role) => (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          <Users className="h-3.5 w-3.5" />
+          {role.users_count} {t('roles.usersShort')}
+        </span>
+      ),
+    },
+  ];
+
+  const renderActions = (role: Role) => (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setEditing(role)}>
+        {role.is_system ? t('common.view') : t('common.edit')}
+      </Button>
+      {!role.is_system && (
+        <Button size="sm" variant="ghost" onClick={() => onDelete(role)}>
+          <Trash2 className="h-4 w-4 text-red-500" />
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <section className="space-y-5 p-4 md:p-6">
       <AdminTabs section="access" />
@@ -48,51 +134,31 @@ export function RolesPage() {
         </Can>
       </header>
 
-      <Input
-        placeholder={t('common.search')}
-        value={roles.search}
-        onChange={(e) => roles.setSearch(e.target.value)}
+      <ListToolbar
+        search={roles.search}
+        onSearch={roles.setSearch}
+        filters={filterDefs}
+        values={roles.filters}
+        onFilter={roles.setFilter}
+        onClear={roles.clear}
+        actions={
+          <ExportButton
+            filename="roles"
+            columns={exportColumns}
+            disabled={roles.total === 0}
+            load={() => fetchAllPages(getRoles, roles.query)}
+          />
+        }
       />
 
-      <div className="space-y-3">
-        {roles.items.map((role) => (
-          <Card key={role.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="flex items-center gap-2 font-medium">
-                  {role.name}
-                  {role.is_system && <Badge variant="info">{t('roles.system')}</Badge>}
-                </p>
-                {role.description && (
-                  <p className="mt-1 text-sm text-muted-foreground">{role.description}</p>
-                )}
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {role.permissions.length} {t('roles.permissionsShort')}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5" />
-                    {role.users_count} {t('roles.usersShort')}
-                  </span>
-                </div>
-              </div>
-              <Can permission={PERMISSIONS.rolesManage}>
-                <div className="flex shrink-0 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(role)}>
-                    {role.is_system ? t('common.view') : t('common.edit')}
-                  </Button>
-                  {!role.is_system && (
-                    <Button size="sm" variant="ghost" onClick={() => onDelete(role)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  )}
-                </div>
-              </Can>
-            </div>
-          </Card>
-        ))}
-      </div>
+      <DataTable
+        columns={columns}
+        rows={roles.items}
+        rowKey={(role) => role.id}
+        isLoading={roles.isLoading}
+        emptyMessage="list.noResults"
+        actions={can(PERMISSIONS.rolesManage) ? renderActions : undefined}
+      />
 
       <PaginatedComplete
         page={roles.page}
@@ -100,6 +166,7 @@ export function RolesPage() {
         total={roles.total}
         links={roles.links}
         onPageChange={roles.setPage}
+        onLimitChange={roles.setLimit}
       />
 
       <Dialog

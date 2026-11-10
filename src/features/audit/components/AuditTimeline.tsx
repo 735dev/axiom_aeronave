@@ -53,6 +53,18 @@ function ChangeRow({ change }: { change: AuditChange }) {
   );
 }
 
+/** Los campos que cambió un hecho, antes y después. Lo usan la línea de tiempo y la bitácora global. */
+export function AuditChangeList({ changes }: { changes: AuditChange[] }) {
+  if (changes.length === 0) return null;
+  return (
+    <ul className="rounded-lg border border-border bg-muted/60 px-3 py-1.5">
+      {changes.map((change, i) => (
+        <ChangeRow key={`${change.field}-${i}`} change={change} />
+      ))}
+    </ul>
+  );
+}
+
 interface Props {
   events: AuditEvent[];
   /** Muestra a qué entidad pertenece cada hecho: útil en la bitácora global. */

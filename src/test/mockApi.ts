@@ -51,7 +51,11 @@ export const USERS = {
   admin: 'admin@transvalor.com',
   director: 'gerencia@transvalor.com',
   maintenance: 'mantenimiento@transvalor.com',
+  avsec: 'avsec@transvalor.com',
 } as const;
+
+/** Pasos firmables de una operación, en el orden del formato (capitán, mantenimiento, AVSEC, gerencia). */
+export const SIGNING_STEPS = ['sign_captain', 'sign_maintenance', 'sign_avsec', 'sign_general'] as const;
 
 /** Imagen mínima válida como `data:` URL. */
 export const PNG = 'data:image/png;base64,iVBORw0KGgo=';
