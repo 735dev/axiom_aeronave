@@ -4,6 +4,7 @@ export type FieldType =
   | 'text'
   | 'textarea'
   | 'number'
+  | 'integer'
   | 'money'
   | 'select'
   | 'date'
@@ -28,6 +29,8 @@ export type FieldRole =
   | 'accounting_date'
   /** Proveedor que emitió el comprobante: se prellena desde la lectura. */
   | 'supplier'
+  /** Tasa Bs/USD de la operación: el sistema propone la oficial del día. */
+  | 'exchange_rate'
   /** Matrícula que da nombre al expediente: `YV2323-001-26`. */
   | 'aircraft'
   /** Marca y modelo de la aeronave: se proponen al elegir la matrícula. */

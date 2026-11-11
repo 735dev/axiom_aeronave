@@ -20,6 +20,22 @@ export interface CatalogItemPayload {
   extra?: string;
 }
 
+export interface UserOption {
+  value: string;
+  label: string;
+}
+
+/** Personas activas de un rol (capitanes, por ejemplo): solo el nombre sale del servidor. */
+export async function getUserOptions(role: string): Promise<ApiResult<UserOption[]>> {
+  try {
+    const res = await apiAxios.get({ url: `/user-options/?${qs({ role })}` });
+    if (isSuccessfully(res.status)) return { ok: true, data: res.data };
+    return handleMessageAxios(res.data);
+  } catch (e) {
+    return handleErrorAxios(e as never);
+  }
+}
+
 export async function getCatalogs(): Promise<ApiResult<CatalogDefinition[]>> {
   try {
     const res = await apiAxios.get({ url: '/catalogs/' });

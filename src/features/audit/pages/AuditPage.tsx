@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { useAuditLog } from '../hooks/useAudit';
 import { exportAuditCsv } from '../api/auditApi';
-import { AuditChangeList } from '../components/AuditTimeline';
+import { AuditDetail } from '../components/AuditDetail';
 import { AuditAction, AuditEntity, AuditEvent, AuditFilters } from '../types/audit.types';
 import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -32,7 +32,17 @@ const ACTIONS: AuditAction[] = [
 /** Las acciones sensibles se marcan para que salten a la vista al revisar. */
 const SENSITIVE: AuditAction[] = ['permission_change', 'delete', 'login_failed', 'denied'];
 
-const ENTITIES: AuditEntity[] = ['ticket', 'user', 'role', 'ticket_type', 'catalog', 'reconciliation', 'session'];
+const ENTITIES: AuditEntity[] = [
+  'ticket',
+  'user',
+  'role',
+  'ticket_type',
+  'catalog',
+  'reconciliation',
+  'passenger',
+  'notification',
+  'session',
+];
 
 export function AuditPage() {
   const t = useT();
@@ -40,6 +50,14 @@ export function AuditPage() {
   const debounced = useDebounce(search, 300);
   const { values, setFilter, reset } = useListFilters();
   const [exporting, setExporting] = useState(false);
+  // Cada hecho es una línea; el detalle se abre a pedido y puede haber varios abiertos.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const filters = useMemo<AuditFilters>(
     () => ({
@@ -160,9 +178,24 @@ export function AuditPage() {
         rowKey={(event) => event.id}
         isLoading={isLoading}
         emptyMessage="audit.empty"
-        renderExpanded={(event) =>
-          event.changes.length > 0 ? <AuditChangeList changes={event.changes} /> : null
-        }
+        onRowClick={(event) => toggle(event.id)}
+        actions={(event) => (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={open.has(event.id)}
+            onClick={() => toggle(event.id)}
+          >
+            {open.has(event.id) ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            {open.has(event.id) ? t('audit.detail.hide') : t('audit.detail.show')}
+          </Button>
+        )}
+        renderExpanded={(event) => (open.has(event.id) ? <AuditDetail event={event} /> : null)}
       />
 
       <PaginatedComplete

@@ -112,6 +112,8 @@
     "email": "Correo inválido",
     "required": "Este campo es obligatorio",
     "positive": "Debe ser mayor que cero",
+    "nonNegative": "No puede ser negativo",
+    "integer": "Debe ser un número entero",
     "invalid": "Formato inválido",
     "unauthorizedTitle": "Sesión expirada",
     "unauthorizedDetail": "Inicia sesión nuevamente.",
@@ -320,6 +322,13 @@
     "scopesShort": "tipos"
   },
   "tickets": {
+    "savedValueSuffix": "(valor anterior)",
+    "rate": {
+      "loading": "Consultando la tasa oficial…",
+      "failed": "No se pudo consultar la tasa. Escríbela a mano.",
+      "proposed": "Tasa oficial del {date}. Puedes cambiarla.",
+      "refresh": "Consultar de nuevo"
+    },
     "title": "Tickets",
     "subtitle": "Todo el trabajo del sistema, filtrado por lo que te toca",
     "search": "Buscar por código, título u operación",
@@ -415,7 +424,8 @@
         "item": "Concepto",
         "quantity": "Cantidad",
         "unit": "Unidad",
-        "supplier": "Proveedor"
+        "supplier": "Proveedor",
+        "exchange_rate": "Tasa del día (Bs/USD)"
       }
     },
     "width": {
@@ -426,6 +436,7 @@
       "text": "Texto",
       "textarea": "Texto largo",
       "number": "Número",
+      "integer": "Número entero",
       "money": "Monto",
       "select": "Lista desplegable",
       "date": "Fecha",
@@ -439,6 +450,10 @@
       "currencies": "Monedas",
       "operation_kinds": "Tipos de operación",
       "operation_scopes": "Alcances",
+      "service_types": "Tipos de servicio",
+      "fbos": "FBO",
+      "fuel_suppliers": "Proveedores de combustible",
+      "users:pilot": "Capitanes (usuarios con rol piloto)",
       "aircraft_statuses": "Estados de aeronave",
       "aircrafts": "Aeronaves",
       "aircraft_brands": "Marcas de aeronave",
@@ -526,7 +541,10 @@
       "module": "Módulos",
       "catalog": "Catálogos",
       "reconciliation": "Conciliación",
-      "session": "Accesos"
+      "session": "Accesos",
+      "notification": "Avisos",
+      "passenger": "Pasajeros",
+      "audit": "Auditoría"
     },
     "actions": {
       "create": "Creación",
@@ -542,6 +560,25 @@
       "logout": "Cierre de sesión",
       "permission_change": "Cambio de permisos",
       "export": "Exportación"
+    },
+    "detail": {
+      "show": "Ver detalle",
+      "hide": "Ocultar",
+      "changes": "Qué cambió",
+      "initialValues": "Valores iniciales",
+      "field": "Campo",
+      "before": "Antes",
+      "after": "Ahora",
+      "value": "Valor",
+      "noChanges": "Este hecho no modificó campos.",
+      "record": "Datos del registro",
+      "when": "Fecha y hora",
+      "user": "Usuario",
+      "entity": "Sobre qué",
+      "entityId": "Identificador",
+      "ip": "Dirección IP",
+      "device": "Dispositivo",
+      "eventId": "Id del hecho"
     }
   },
   "totals": {
@@ -727,6 +764,7 @@
     "title": "En qué operaciones viajó una persona",
     "placeholder": "Documento o nombre",
     "hint": "Escribe al menos 2 caracteres. El documento se busca sin puntos ni guiones.",
+    "recent": "Personas de las operaciones más recientes. Escribe para filtrar por documento o nombre.",
     "none": "Sin resultados",
     "trips": "{count} operaciones"
   },

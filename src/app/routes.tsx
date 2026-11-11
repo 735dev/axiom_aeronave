@@ -91,7 +91,7 @@ export function AppRoutes() {
           <Route
             path="/pasajeros"
             element={
-              <RequirePermission permission={PERMISSIONS.ticketsView}>
+              <RequirePermission permission={PERMISSIONS.passengersView}>
                 <PassengersSearchPage />
               </RequirePermission>
             }

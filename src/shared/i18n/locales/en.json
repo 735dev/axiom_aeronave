@@ -112,6 +112,8 @@
     "email": "Invalid email",
     "required": "This field is required",
     "positive": "Must be greater than zero",
+    "nonNegative": "Cannot be negative",
+    "integer": "Must be a whole number",
     "invalid": "Invalid format",
     "unauthorizedTitle": "Session expired",
     "unauthorizedDetail": "Please sign in again.",
@@ -320,6 +322,13 @@
     "scopesShort": "types"
   },
   "tickets": {
+    "savedValueSuffix": "(previous value)",
+    "rate": {
+      "loading": "Fetching the official rate…",
+      "failed": "Could not fetch the rate. Type it in.",
+      "proposed": "Official rate of {date}. You can change it.",
+      "refresh": "Fetch again"
+    },
     "title": "Tickets",
     "subtitle": "All the work in the system, filtered by what is yours",
     "search": "Search by code, title or operation",
@@ -415,7 +424,8 @@
         "item": "Item",
         "quantity": "Quantity",
         "unit": "Unit",
-        "supplier": "Supplier"
+        "supplier": "Supplier",
+        "exchange_rate": "Exchange rate (Bs/USD)"
       }
     },
     "width": {
@@ -426,6 +436,7 @@
       "text": "Text",
       "textarea": "Long text",
       "number": "Number",
+      "integer": "Whole number",
       "money": "Amount",
       "select": "Dropdown",
       "date": "Date",
@@ -439,6 +450,10 @@
       "currencies": "Currencies",
       "operation_kinds": "Operation kinds",
       "operation_scopes": "Scopes",
+      "service_types": "Service types",
+      "fbos": "FBOs",
+      "fuel_suppliers": "Fuel suppliers",
+      "users:pilot": "Captains (users with the pilot role)",
       "aircraft_statuses": "Aircraft statuses",
       "aircrafts": "Aircraft",
       "aircraft_brands": "Aircraft makes",
@@ -526,7 +541,10 @@
       "module": "Modules",
       "catalog": "Catalogs",
       "reconciliation": "Reconciliation",
-      "session": "Sign-ins"
+      "session": "Sign-ins",
+      "notification": "Notices",
+      "passenger": "Passengers",
+      "audit": "Audit"
     },
     "actions": {
       "create": "Created",
@@ -542,6 +560,25 @@
       "logout": "Sign-out",
       "permission_change": "Permission change",
       "export": "Export"
+    },
+    "detail": {
+      "show": "Show detail",
+      "hide": "Hide",
+      "changes": "What changed",
+      "initialValues": "Initial values",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "value": "Value",
+      "noChanges": "This event did not change any field.",
+      "record": "Record",
+      "when": "Date and time",
+      "user": "User",
+      "entity": "About",
+      "entityId": "Identifier",
+      "ip": "IP address",
+      "device": "Device",
+      "eventId": "Event id"
     }
   },
   "totals": {
@@ -727,6 +764,7 @@
     "title": "Which operations a person flew on",
     "placeholder": "Document or name",
     "hint": "Type at least 2 characters. Documents are matched without dots or dashes.",
+    "recent": "People from the most recent operations. Type to filter by document or name.",
     "none": "No results",
     "trips": "{count} operations"
   },

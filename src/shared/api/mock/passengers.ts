@@ -63,7 +63,7 @@ function routeOf(ticket: Ticket): string {
 export function searchPassengers(operations: Ticket[], rawQuery: string): PassengerMatch[] {
   const nameQuery = foldText(rawQuery);
   const docQuery = normalizeDocument(rawQuery);
-  if (!nameQuery) return [];
+  // Sin texto lista a los más recientes, igual que el servidor.
   // Buscar por documento exige algún dígito: "ana" no debe traer el pasaporte "ANA123".
   const byDocument = docQuery.length >= MIN_DOCUMENT_QUERY && /\d/.test(docQuery);
 
@@ -75,7 +75,9 @@ export function searchPassengers(operations: Ticket[], rawQuery: string): Passen
       const docKey = normalizeDocument(pax.document);
       if (!docKey) continue;
       const hit =
-        foldText(pax.full_name).includes(nameQuery) || (byDocument && docKey.includes(docQuery));
+        !nameQuery ||
+        foldText(pax.full_name).includes(nameQuery) ||
+        (byDocument && docKey.includes(docQuery));
       if (!hit) continue;
 
       let entry = people.get(docKey);

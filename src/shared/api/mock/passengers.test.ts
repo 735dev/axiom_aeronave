@@ -70,10 +70,10 @@ describe('búsqueda de pasajeros', () => {
     expect(r.data.data).toEqual([]);
   });
 
-  it('consulta vacía no lista a todo el mundo', () => {
+  it('consulta vacía lista a los más recientes', () => {
     const s = loginAs(USERS.superuser);
     setPax(s, ops(s)[0].id, [MARIA, JUAN]);
-    expect(search(s, '   ').data.data).toEqual([]);
+    expect(search(s, '   ').data.data.length).toBeGreaterThan(0);
   });
 
   it('un nombre corto no cuela documentos que contienen esas letras', () => {

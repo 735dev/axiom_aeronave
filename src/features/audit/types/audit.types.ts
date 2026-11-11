@@ -26,7 +26,10 @@ export type AuditEntity =
   | 'module'
   | 'catalog'
   | 'reconciliation'
-  | 'session';
+  | 'session'
+  | 'notification'
+  | 'passenger'
+  | 'audit';
 
 /** Un campo que cambió, con su valor antes y después. */
 export interface AuditChange {

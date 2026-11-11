@@ -63,10 +63,8 @@ export function PassengersSearchPage() {
   ];
 
   useEffect(() => {
-    if (q.length < MIN_CHARS) {
-      setResults(null);
-      return;
-    }
+    // Vacío lista a los más recientes; una sola letra no informa y se espera a la segunda.
+    if (q.length > 0 && q.length < MIN_CHARS) return;
     let cancelled = false;
     setLoading(true);
     void searchPassengers(q).then((res) => {
@@ -131,9 +129,9 @@ export function PassengersSearchPage() {
         />
       </div>
 
-      {results === null && !isLoading && (
-        <p className="text-sm text-muted-foreground">{t('passengerSearch.hint')}</p>
-      )}
+      <p className="text-sm text-muted-foreground">
+        {q ? t('passengerSearch.hint') : t('passengerSearch.recent')}
+      </p>
       {results?.length === 0 && !isLoading && (
         <p className="text-sm text-muted-foreground" data-testid="passenger-no-results">
           {t('passengerSearch.none')}

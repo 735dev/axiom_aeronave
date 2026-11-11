@@ -4,6 +4,7 @@ export const PERMISSIONS = {
   ticketsCreate: 'tickets.create',
   ticketsEdit: 'tickets.edit',
   ticketsDecideAny: 'tickets.decide_any',
+  passengersView: 'passengers.view',
   ticketTypesManage: 'ticket_types.manage',
   usersView: 'users.view',
   usersManage: 'users.manage',

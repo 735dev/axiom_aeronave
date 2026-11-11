@@ -505,6 +505,15 @@ export function routeAdmin(
     };
   }
 
+  if (method === 'get' && path === '/user-options/') {
+    const role = query.get('role') ?? '';
+    const names = adminState.users
+      .filter((u) => u.is_active && adminState.roles.some((r) => r.id === u.role_id && r.code === role))
+      .map((u) => u.full_name)
+      .sort((x, y) => x.localeCompare(y));
+    return { status: 200, data: names.map((n) => ({ value: n, label: n })) };
+  }
+
   if (method === 'get' && path === '/catalog-items/') {
     const catalog = query.get('catalog');
     const onlyActive = query.get('is_active') === 'true';

@@ -4,11 +4,16 @@ export type CatalogKey =
   | 'currencies'
   | 'operation_kinds'
   | 'operation_scopes'
+  | 'service_types'
   | 'aircraft_statuses'
   | 'aircrafts'
   | 'aircraft_brands'
   | 'aircraft_models'
   | 'airports'
+  | 'fbos'
+  | 'fuel_suppliers'
+  /** Personas activas de un rol (`users:pilot` = capitanes), no un catálogo editable. */
+  | `users:${string}`
   | 'locations';
 
 export interface CatalogDefinition {

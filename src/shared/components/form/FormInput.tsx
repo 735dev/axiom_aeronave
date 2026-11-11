@@ -15,6 +15,9 @@ interface FormInputProps<T extends FieldValues> {
   inputClassName?: string;
   readOnly?: boolean;
   autoComplete?: string;
+  /** Solo para `type="number"`: límite inferior y paso del control. */
+  min?: number;
+  step?: number | 'any';
 }
 
 export function FormInput<T extends FieldValues>({
@@ -26,6 +29,8 @@ export function FormInput<T extends FieldValues>({
   inputClassName,
   readOnly,
   autoComplete,
+  min,
+  step,
 }: FormInputProps<T>) {
   const { control } = useFormContext<T>();
   const t = useT();
@@ -48,6 +53,8 @@ export function FormInput<T extends FieldValues>({
               }
               type={isPassword && revealed ? 'text' : type}
               readOnly={readOnly}
+              min={type === 'number' ? min : undefined}
+              step={type === 'number' ? step : undefined}
               autoComplete={autoComplete}
               placeholder={placeholder ? t(placeholder) : undefined}
             />

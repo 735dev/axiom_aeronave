@@ -5,6 +5,7 @@ import { buildDynamicSchema, DynamicValues } from '../schemas/dynamicSchema';
 import { Extraction, FieldDef } from '../types/ticket.types';
 import { DynamicField } from './DynamicField';
 import { resolveAircraftAutofill } from '../utils/aircraftAutofill';
+import { ExchangeRate, getExchangeRate } from '../api/exchangeRateApi';
 import { useCatalogOptions } from '@/features/catalogs/hooks/useCatalog';
 import { Button } from '@/shared/components/ui/button';
 import { useT } from '@/shared/hooks/useT';
@@ -99,6 +100,38 @@ export function DynamicForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aircraftValue, aircrafts, models]);
 
+  // La tasa oficial se propone al crear. Nunca pisa lo que la persona escribió ni lo que ya
+  // trae un expediente abierto, y si la fuente no responde queda el campo para escribirla.
+  const rateField = fields.find((f) => f.role === 'exchange_rate');
+  const [proposedRate, setProposedRate] = useState<ExchangeRate | null>(null);
+  const [rateFailed, setRateFailed] = useState(false);
+  const [rateLoading, setRateLoading] = useState(false);
+  const rateEditable = Boolean(rateField) && !readOnly;
+  const rateKey = rateField?.key;
+  const loadRate = async (overwrite: boolean) => {
+    if (!rateKey) return;
+    setRateLoading(true);
+    const res = await getExchangeRate();
+    setRateLoading(false);
+    if (!res.ok) {
+      setRateFailed(true);
+      return;
+    }
+    setRateFailed(false);
+    setProposedRate(res.data);
+    const current = methods.getValues(rateKey);
+    const empty = current === '' || current === undefined || current === null || Number.isNaN(current);
+    if (overwrite || empty) {
+      methods.setValue(rateKey, res.data.rate, { shouldDirty: true, shouldValidate: false });
+    }
+  };
+  useEffect(() => {
+    const preset = rateKey ? defaultValues?.[rateKey] : undefined;
+    const hasValue = preset !== undefined && preset !== null && preset !== '';
+    if (rateEditable && !hasValue) void loadRate(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateEditable, rateKey]);
+
   useEffect(() => {
     if (!serverErrors) return;
     Object.entries(serverErrors).forEach(([key, message]) => {
@@ -162,6 +195,32 @@ export function DynamicForm({
                 )}
               >
                 <DynamicField field={{ ...field, width: 'full' }} locked={readOnly} />
+                {rateEditable && field.key === rateKey && (
+                  <p
+                    className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"
+                    data-testid="rate-note"
+                  >
+                    <span>
+                      {rateLoading
+                        ? t('tickets.rate.loading')
+                        : rateFailed
+                          ? t('tickets.rate.failed')
+                          : proposedRate
+                            ? t('tickets.rate.proposed', {
+                                date: proposedRate.effective_date ?? '—',
+                              })
+                            : ''}
+                    </span>
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline"
+                      disabled={rateLoading}
+                      onClick={() => void loadRate(true)}
+                    >
+                      {t('tickets.rate.refresh')}
+                    </button>
+                  </p>
+                )}
                 {read && (
                   <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                     <span data-testid={`read-${field.key}`}>

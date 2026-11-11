@@ -12,6 +12,7 @@ const FIELD_TYPES: FieldType[] = [
   'text',
   'textarea',
   'number',
+  'integer',
   'money',
   'select',
   'date',
@@ -32,6 +33,7 @@ export const FIELD_ROLES: FieldRole[] = [
   'quantity',
   'unit',
   'supplier',
+  'exchange_rate',
 ];
 
 const CATALOG_KEYS: CatalogKey[] = [
@@ -40,11 +42,15 @@ const CATALOG_KEYS: CatalogKey[] = [
   'currencies',
   'operation_kinds',
   'operation_scopes',
+  'service_types',
   'aircraft_statuses',
   'aircrafts',
   'aircraft_brands',
   'aircraft_models',
   'airports',
+  'fbos',
+  'fuel_suppliers',
+  'users:pilot',
   'locations',
 ];
 

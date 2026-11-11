@@ -107,7 +107,13 @@ export function useCatalogOptions(catalog: CatalogKey | undefined) {
   }, [catalog]);
 
   return useMemo(
-    () => items.map((i) => ({ value: i.code, label: i.name, extra: i.extra })),
-    [items],
+    () =>
+      items.map((i) => ({
+        value: i.code,
+        // Dos aeronaves del mismo modelo se leerían idénticas: la matrícula las distingue.
+        label: catalog === 'aircrafts' ? `${i.code} · ${i.name}` : i.name,
+        extra: i.extra,
+      })),
+    [items, catalog],
   );
 }

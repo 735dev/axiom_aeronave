@@ -13,8 +13,14 @@ export function buildDynamicSchema(fields: FieldDef[]) {
 
     switch (field.type) {
       case 'number':
+      case 'integer':
       case 'money': {
-        const base = z.number({ invalid_type_error: 'errors.required' });
+        const numeric = z.number({ invalid_type_error: 'errors.required' });
+        // Ninguna cantidad de este sistema es negativa; los enteros tampoco admiten fracción.
+        const base = (field.type === 'integer' ? numeric.int('errors.integer') : numeric).min(
+          0,
+          'errors.nonNegative',
+        );
         rule = field.required
           ? base.positive('errors.positive')
           : // Un campo numérico vacío llega como cadena: se normaliza a undefined

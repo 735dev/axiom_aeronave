@@ -22,6 +22,7 @@ export function DynamicField({ field, locked }: { field: FieldDef; locked?: bool
   const { control, getValues, setValue } = useFormContext();
 
   const allCatalogOptions = useCatalogOptions(field.catalog);
+  const ownValue = useWatch({ control, name: field.key });
   // Las opciones de un campo dependiente salen del valor de su padre.
   const parentValue = useWatch({ control, name: field.depends_on ?? field.key, disabled: !field.depends_on });
   const catalogOptions = field.depends_on
@@ -112,7 +113,14 @@ export function DynamicField({ field, locked }: { field: FieldDef; locked?: bool
   }
 
   if (field.type === 'select') {
-    const options = field.catalog ? catalogOptions : (field.options ?? []);
+    const listed = field.catalog ? catalogOptions : (field.options ?? []);
+    // Un valor guardado antes de que el campo fuera una lista (texto libre, o una persona que
+    // ya no está activa) se sigue mostrando: no desaparece ni se pierde al editar el resto.
+    const saved = typeof ownValue === 'string' ? ownValue : '';
+    const options =
+      saved && !listed.some((o) => o.value === saved)
+        ? [{ value: saved, label: `${saved} ${t('tickets.savedValueSuffix')}` }, ...listed]
+        : listed;
     return (
       <div className={className}>
         <FormSelect
@@ -155,7 +163,7 @@ export function DynamicField({ field, locked }: { field: FieldDef; locked?: bool
   }
 
   const inputType =
-    field.type === 'number' || field.type === 'money'
+    field.type === 'number' || field.type === 'integer' || field.type === 'money'
       ? 'number'
       : field.type === 'date'
         ? 'date'
@@ -170,8 +178,12 @@ export function DynamicField({ field, locked }: { field: FieldDef; locked?: bool
         label={label}
         type={inputType}
         readOnly={readOnly}
+        min={inputType === 'number' ? 0 : undefined}
+        step={field.type === 'integer' ? 1 : inputType === 'number' ? 'any' : undefined}
         inputClassName={
-          field.type === 'money' || field.type === 'number' ? 'data' : undefined
+          field.type === 'money' || field.type === 'number' || field.type === 'integer'
+            ? 'data'
+            : undefined
         }
       />
       {field.help && <p className="mt-1 text-xs text-muted-foreground">{field.help}</p>}
