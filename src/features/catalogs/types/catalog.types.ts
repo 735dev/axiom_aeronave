@@ -12,6 +12,7 @@ export type CatalogKey =
   | 'airports'
   | 'fbos'
   | 'fuel_suppliers'
+  | 'suppliers'
   /** Personas activas de un rol (`users:pilot` = capitanes), no un catálogo editable. */
   | `users:${string}`
   | 'locations';

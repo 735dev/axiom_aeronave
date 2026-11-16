@@ -77,11 +77,14 @@ const signAllSteps = (s: Sess, op: any) => {
 };
 
 describe('avisos por evento: alta de tickets', () => {
-  it('una operación nueva avisa SOLO al rol asignado por defecto (Operaciones)', () => {
+  it('una operación nueva avisa a Operaciones y al piloto, sobre la operación', () => {
     const c = who();
     const op = newOp(c.su);
-    expect(receivers(c, op.id)).toEqual(['ops']);
-    expect(about(c.ops, op.id)[0].kind).toBe('operation_created');
+    expect(receivers(c, op.id)).toEqual(['ops', 'pilot']);
+    const notice = about(c.pilot, op.id)[0];
+    expect(notice.kind).toBe('operation_created');
+    expect(notice.body).toContain(op.code);
+    expect(notice.body).not.toContain('Reporte');
   });
 
   it('una operación asignada a otro rol avisa a ese rol y no al de por defecto', () => {
@@ -100,7 +103,7 @@ describe('avisos por evento: alta de tickets', () => {
     const c = who();
     const op = newOp(c.su, { assigned_user_id: 'u-999' });
     expect(op.assigned_user_id).toBeUndefined();
-    expect(receivers(c, op.id)).toEqual(['ops']);
+    expect(receivers(c, op.id)).toEqual(['ops', 'pilot']);
   });
 
   it('el superusuario NO recibe avisos de audiencias ajenas', () => {

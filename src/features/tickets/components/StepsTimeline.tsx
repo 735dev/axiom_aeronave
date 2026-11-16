@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Check, CircleSlash, X } from 'lucide-react';
-import { Decision, DecisionValue, StepDef } from '../types/ticket.types';
+import { Decision, DecisionValue, FieldDef, StepDef } from '../types/ticket.types';
+import { DynamicValues } from '../schemas/dynamicSchema';
 import { decideStep } from '../api/ticketsApi';
+import { blockedByEarlierRoleStep, groupStepFields } from '../utils/stepFields';
+import { StepFields } from './StepFields';
 import { Button } from '@/shared/components/ui/button';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { Select } from '@/shared/components/ui/select';
@@ -23,9 +26,14 @@ interface Props {
   ticketId: string;
   steps: StepDef[];
   decisions: Decision[];
+  fields: FieldDef[];
+  payload: DynamicValues;
   canDecide: boolean;
   /** Permite registrar decisiones de pasos que corresponden a otro rol. */
   canDecideAny: boolean;
+  serverErrors?: Record<string, string>;
+  /** Guarda solo los datos del paso. El registro del paso lo hace esta línea de tiempo. */
+  onSave: (values: DynamicValues) => Promise<boolean>;
   onDecided: () => void;
 }
 
@@ -33,18 +41,36 @@ export function StepsTimeline({
   ticketId,
   steps,
   decisions,
+  fields,
+  payload,
   canDecide,
   canDecideAny,
+  serverErrors,
+  onSave,
   onDecided,
 }: Props) {
   const t = useT();
   const { user } = useAuth();
   const [active, setActive] = useState<StepDef | null>(null);
+  const [opened, setOpened] = useState<string | null>(null);
   const [decision, setDecision] = useState<DecisionValue>('done');
   const [observation, setObservation] = useState('');
   const [isSubmitting, setSubmitting] = useState(false);
 
   const sorted = [...steps].sort((a, b) => a.sort_order - b.sort_order);
+  const fieldsByStep = groupStepFields(fields, steps);
+  const canAct = (step: StepDef) => {
+    const isMine = !step.role_id || step.role_id === user?.role_id;
+    return canDecide && (isMine || canDecideAny);
+  };
+  const decided = new Set(decisions.map((item) => item.step_code));
+  const firstWithFields = sorted.find(
+    (step) =>
+      canAct(step) &&
+      !decided.has(step.code) &&
+      (fieldsByStep.get(step.code)?.length ?? 0) > 0,
+  );
+  const openCode = opened ?? firstWithFields?.code ?? null;
 
   const submit = async () => {
     if (!active) return;
@@ -61,17 +87,43 @@ export function StepsTimeline({
     notify.fromApiError(res);
   };
 
+  const submitFields = async (step: StepDef, values: DynamicValues) => {
+    setSubmitting(true);
+    const saved = await onSave(values);
+    if (!saved) {
+      setSubmitting(false);
+      return;
+    }
+    const previous = decisions.find((item) => item.step_code === step.code);
+    const res = await decideStep(ticketId, {
+      step_code: step.code,
+      decision: previous?.decision ?? 'done',
+      observation: previous?.observation,
+    });
+    setSubmitting(false);
+    onDecided();
+    if (res.ok) {
+      notify.toast.success(t('tickets.decisionSaved'));
+      setOpened(null);
+      return;
+    }
+    notify.fromApiError(res);
+  };
+
   return (
     <>
       <ol className="divide-y divide-border">
         {sorted.map((step, index) => {
           const taken = decisions.find((d) => d.step_code === step.code);
           const Icon = taken ? ICONS[taken.decision] : null;
-          const isMine = !step.role_id || step.role_id === user?.role_id;
-          const allowed = canDecide && (isMine || canDecideAny);
+          const allowed = canAct(step);
+          const stepFields = fieldsByStep.get(step.code) ?? [];
+          const isLater = !taken && blockedByEarlierRoleStep(step, sorted, decided, canAct);
+          const showingForm = openCode === step.code && stepFields.length > 0 && allowed && !isLater;
 
           return (
-            <li key={step.id} className="flex items-start gap-3 py-3">
+            <li key={step.id} className="py-3">
+              <div className="flex items-start gap-3">
               <span
                 className={cn(
                   'mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border font-mono text-[11px]',
@@ -125,20 +177,47 @@ export function StepsTimeline({
                 )}
               </div>
 
-              {allowed && (
+              {allowed && !showingForm && !isLater && (
                 <Button
                   size="sm"
                   variant={taken ? 'ghost' : 'outline'}
                   className="shrink-0"
                   onClick={() => {
+                    if (stepFields.length > 0) {
+                      setOpened(step.code);
+                      return;
+                    }
                     setActive(step);
                     setDecision(taken?.decision ?? 'done');
                     setObservation(taken?.observation ?? '');
                   }}
                 >
-                  {taken ? t('common.edit') : isMine ? t('tickets.decide') : t('tickets.decideAsAdmin')}
+                  {taken
+                    ? t('common.edit')
+                    : canDecideAny && step.role_id && step.role_id !== user?.role_id
+                      ? t('tickets.decideAsAdmin')
+                      : t('tickets.decide')}
                 </Button>
               )}
+              </div>
+              {stepFields.length > 0 &&
+                (showingForm ? (
+                  <div className="pl-10">
+                    <StepFields
+                      fields={stepFields}
+                      payload={payload}
+                      readOnly={false}
+                      showPhotoHint={stepFields.some((field) => field.type === 'file')}
+                      isSubmitting={isSubmitting}
+                      serverErrors={serverErrors}
+                      onSubmit={(values) => void submitFields(step, values)}
+                    />
+                  </div>
+                ) : (
+                  <div className="pl-10">
+                    <StepFields fields={stepFields} payload={payload} readOnly onSubmit={() => undefined} />
+                  </div>
+                ))}
             </li>
           );
         })}

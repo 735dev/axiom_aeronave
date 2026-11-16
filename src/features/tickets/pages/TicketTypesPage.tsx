@@ -73,10 +73,10 @@ export function TicketTypesPanel() {
     { header: t('listData.csv.active'), value: (x) => yesNo(x.is_active) },
     { header: t('listData.csv.system'), value: (x) => yesNo(x.is_system) },
     { header: t('listData.csv.role'), value: (x) => x.default_role_name },
-    { header: t('listData.csv.fields'), value: (x) => x.fields.length },
-    { header: t('listData.csv.statuses'), value: (x) => x.statuses.length },
-    { header: t('listData.csv.steps'), value: (x) => x.steps.length },
-    { header: t('listData.csv.tickets'), value: (x) => x.tickets_count },
+    { header: t('listData.csv.fields'), value: (x) => x.fields.length, origen: 'calculado' },
+    { header: t('listData.csv.statuses'), value: (x) => x.statuses.length, origen: 'calculado' },
+    { header: t('listData.csv.steps'), value: (x) => x.steps.length, origen: 'calculado' },
+    { header: t('listData.csv.tickets'), value: (x) => x.tickets_count, origen: 'calculado' },
   ];
 
   const tableColumns: Column<TicketType>[] = [

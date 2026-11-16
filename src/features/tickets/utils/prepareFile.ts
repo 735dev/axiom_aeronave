@@ -133,11 +133,33 @@ function jpegName(name: string): string {
   return `${base}.jpg`;
 }
 
-/** Deja un archivo listo para enviar: la foto se prepara, lo demás pasa tal cual. */
+/** Solo un gasto (tiene monto) es un comprobante: ahí sí se endereza el documento. */
+export function scansReceipts(fields: { role?: string }[] | undefined): boolean {
+  return Boolean(fields?.some((field) => field.role === 'amount'));
+}
+
+/**
+ * Foto a tamaño de envío, en color. No detecta bordes ni la pasa a escala de grises:
+ * eso es el filtro del comprobante y deja irreconocible una evidencia.
+ */
+async function photoAsJpeg(file: File): Promise<string> {
+  const image = await loadImage(file);
+  const scale = Math.min(1, MAX_SIDE / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas');
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+/** Deja un archivo listo para enviar. `scan` solo para el comprobante de un gasto. */
 export async function toAttachmentInput(
   file: File,
   /** Opcional: recibe qué camino siguió la foto (recortada o completa). */
   onPrepared?: (report: PrepareReport) => void,
+  options?: { scan?: boolean },
 ): Promise<AttachmentInput> {
   const isImage = file.type.startsWith('image/');
   const name = isImage ? jpegName(file.name) : file.name;
@@ -145,10 +167,12 @@ export async function toAttachmentInput(
     throw new AttachmentRejected('attachments.badType');
   }
   let dataUrl: string;
-  if (isImage) {
+  if (isImage && options?.scan) {
     const prepared = await prepareImageDetailed(file);
     dataUrl = prepared.dataUrl;
     onPrepared?.({ path: prepared.path, confidence: prepared.confidence });
+  } else if (isImage) {
+    dataUrl = await photoAsJpeg(file);
   } else {
     dataUrl = await readAsDataUrl(file);
   }

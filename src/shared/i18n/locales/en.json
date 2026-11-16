@@ -132,6 +132,7 @@
     "genericTitle": "Something went wrong",
     "genericDetail": "The operation could not be completed.",
     "title": {
+      "0": "No connection",
       "200": "Done",
       "201": "Created",
       "204": "Deleted",
@@ -175,8 +176,7 @@
     "review": "Validation",
     "reconciliation": "Reconciliation",
     "rules": "Rules",
-    "passengerSearch": "Passengers",
-    "quicklog": "Flight log"
+    "passengerSearch": "Passengers"
   },
   "notifications": {
     "kind": {
@@ -368,6 +368,8 @@
     "onlyOpen": "Open",
     "onlyClosed": "Closed",
     "decideAsAdmin": "Record on behalf",
+    "stepHint": "Fill this in and press Record. That completes your step.",
+    "stepPhoto": "If you have a photo of the fault, add it under Receipts.",
     "readOnlyField": "Read only",
     "ruleHits": "Rule alerts",
     "confirmReadFields": "Confirm the marked values before saving: the system is not sure of them.",
@@ -412,6 +414,9 @@
       "required": "Required",
       "viewPermission": "Permission to view the field",
       "editPermission": "Permission to edit the field",
+      "step": "Answered in the step",
+      "stepNone": "General form",
+      "stepHint": "Whoever holds that step's role fills it in.",
       "roleNone": "None (free field)",
       "roleHint": "Totals, the file number and receipt reading come from this field. A role identifies a single field.",
       "roles": {
@@ -453,6 +458,7 @@
       "service_types": "Service types",
       "fbos": "FBOs",
       "fuel_suppliers": "Fuel suppliers",
+      "suppliers": "Suppliers",
       "users:pilot": "Captains (users with the pilot role)",
       "aircraft_statuses": "Aircraft statuses",
       "aircrafts": "Aircraft",
@@ -474,6 +480,15 @@
     "stepsHint": "Each step records who decided, what and when.",
     "isInitial": "Initial status",
     "isFinal": "Closes the ticket",
+    "advanceAll": "Reached when every required step is recorded",
+    "advanceStep": "Reached when this step is recorded",
+    "advanceFieldNone": "Without looking at a field",
+    "advanceEquals": "When the field equals",
+    "advanceYes": "Yes",
+    "advanceNo": "No",
+    "advanceOnly": "Only when that is the only recorded step",
+    "advanceAdd": "Add condition",
+    "advanceHint": "Without conditions, someone chooses the status by hand.",
     "isRoot": "Is a file that groups other tickets",
     "childTypes": "Types it can contain",
     "rootBadge": "File",
@@ -677,9 +692,9 @@
       "why": "A closing is never reopened: the result is already available to the accounting system and reopening it would change figures someone signed off. If there was a mistake, it is fixed with an entry in the following period."
     },
     "export": {
-      "action": "Export CSV",
+      "action": "Export",
       "done": "Detail exported",
-      "file": "reconciliation-{period}.csv"
+      "file": "reconciliation-{period}"
     },
     "csv": {
       "code": "Expense",
@@ -768,42 +783,6 @@
     "none": "No results",
     "trips": "{count} operations"
   },
-  "quicklog": {
-    "title": "Flight log",
-    "saved": "Flight log saved",
-    "operation": "Operation",
-    "pickOperation": "Choose operation",
-    "departure": "Actual departure",
-    "arrival": "Actual arrival",
-    "now": "Now",
-    "nextDay": "Arrived the next day",
-    "finding": "There was a finding",
-    "notePlaceholder": "Short note",
-    "save": "Save flight log",
-    "viewFile": "View file {code}",
-    "noAccess": "Your role cannot record the flight log.",
-    "errors": {
-      "operation": "Choose the operation.",
-      "departureRequired": "Departure time is missing.",
-      "arrivalRequired": "Arrival time is missing.",
-      "timeInvalid": "Invalid time.",
-      "sameTime": "Departure and arrival are the same. Check the times.",
-      "arrivalBeforeDeparture": "Arrival is before departure. If it landed the next day, turn on \"Arrived the next day\".",
-      "noteRequired": "Describe the finding with a short note or by tapping an option.",
-      "noteTooLong": "The note allows up to 280 characters."
-    },
-    "chips": {
-      "engine": "Engine",
-      "landing_gear": "Landing gear",
-      "avionics": "Avionics",
-      "hydraulic": "Hydraulic",
-      "electric": "Electrical",
-      "tires": "Tires",
-      "fuel": "Fuel",
-      "weather": "Weather",
-      "bird": "Bird strike"
-    }
-  },
   "passengers": {
     "title": "Passengers",
     "name": "Full name",
@@ -885,6 +864,21 @@
     "clear": "Clear filters",
     "export": "Export",
     "exportTruncated": "The first {max} records were exported. Narrow the filters for the rest.",
+    "exportPick": {
+      "subtitle": "PDF to read or print. Excel to keep working. Choose what goes in.",
+      "calculated": "Calculated figures",
+      "calculatedHint": "Figures already shown on the screen.",
+      "columns": "Table columns",
+      "columnsHint": "The columns of the list.",
+      "all": "All",
+      "pdf": "PDF",
+      "excel": "Excel",
+      "empty": "There are no fields to export.",
+      "needOne": "Choose at least one field.",
+      "records": "Records",
+      "people": "People",
+      "operations": "Operations"
+    },
     "noResults": "No results with these filters",
     "filter": {
       "status": "Status",

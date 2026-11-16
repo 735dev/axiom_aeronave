@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import {
   acknowledgeDifference,
   closeReconciliationPeriod,
@@ -10,7 +10,9 @@ import {
 } from '../api/reconciliationApi';
 import { ClosedPeriod, ReconciliationReport, ReconciliationRow, ReconciliationRowState } from '../types/reconciliation.types';
 import { ReconciliationDifference } from '../components/ReconciliationDifference';
-import { buildReconciliationCsv, downloadCsv } from '../utils/reconciliationCsv';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { CsvColumn } from '@/shared/utils/csv';
+import { loadRows } from '@/shared/utils/fetchAllPages';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -132,31 +134,28 @@ export function ReconciliationPage() {
     });
   };
 
-  const exportCsv = async () => {
-    if (!report) return;
-    const csv = buildReconciliationCsv(report.rows, {
-      headers: [
-        'code',
-        'operation',
-        'title',
-        'concept',
-        'date',
-        'status',
-        'amount',
-        'currency',
-        'amount_base',
-        'receipts',
-        'receipt_amount',
-        'receipt_currency',
-        'state',
-        'differences',
-        'justification',
-      ].map((k) => t(`reconciliation.csv.${k}`)),
-      state: (s) => t(`reconciliation.state.${s}`),
-      kind: (k) => t(`reconciliation.kind.${k}`),
-    });
-    downloadCsv(t('reconciliation.export.file', { period }), csv);
-    // Llevarse el detalle es un hecho que la bitácora debe poder probar.
+  const exportColumns: CsvColumn<ReconciliationRow>[] = [
+    { header: t('reconciliation.csv.code'), value: (r) => r.code },
+    { header: t('reconciliation.csv.operation'), value: (r) => r.operation_code },
+    { header: t('reconciliation.csv.title'), value: (r) => r.title },
+    { header: t('reconciliation.csv.concept'), value: (r) => r.concept },
+    { header: t('reconciliation.csv.date'), value: (r) => r.date },
+    { header: t('reconciliation.csv.status'), value: (r) => r.status_name },
+    { header: t('reconciliation.csv.amount'), value: (r) => r.amount, origen: 'calculado' },
+    { header: t('reconciliation.csv.currency'), value: (r) => r.currency },
+    { header: t('reconciliation.csv.amount_base'), value: (r) => r.amount_base, origen: 'calculado' },
+    { header: t('reconciliation.csv.receipts'), value: (r) => r.validated_receipts, origen: 'calculado' },
+    { header: t('reconciliation.csv.receipt_amount'), value: (r) => r.receipt_amount ?? '', origen: 'calculado' },
+    { header: t('reconciliation.csv.receipt_currency'), value: (r) => r.receipt_currency ?? '' },
+    { header: t('reconciliation.csv.state'), value: (r) => t(`reconciliation.state.${r.state}`) },
+    {
+      header: t('reconciliation.csv.differences'),
+      value: (r) => r.difference_kinds.map((k) => t(`reconciliation.kind.${k}`)).join(', '),
+    },
+    { header: t('reconciliation.csv.justification'), value: (r) => r.justification ?? '' },
+  ];
+
+  const recordExport = async () => {
     const res = await recordReconciliationExport(period);
     if (res.ok) notify.toast.success(t('reconciliation.export.done'));
     else notify.fromApiError(res);
@@ -326,10 +325,21 @@ export function ReconciliationPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
               <p className="label-strip">{t('reconciliation.detailTitle')}</p>
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" onClick={exportCsv}>
-                  <Download className="mr-1.5 h-4 w-4" />
-                  {t('reconciliation.export.action')}
-                </Button>
+                {report && (
+                  <ExportButton
+                    filename={t('reconciliation.export.file', { period })}
+                    title={t('reconciliation.detailTitle')}
+                    columns={exportColumns}
+                    figures={[
+                      { label: t('reconciliation.conciliated'), value: `${money(report.totals.reconciled_base)} ${base}` },
+                      { label: t('reconciliation.withDifferences'), value: `${money(report.totals.difference_base)} ${base}` },
+                      { label: t('reconciliation.discardedTotal'), value: `${money(report.totals.discarded_base)} ${base}` },
+                      { label: t('reconciliation.differencesTitle'), value: report.open_differences },
+                    ]}
+                    load={loadRows(report.rows)}
+                    onDone={recordExport}
+                  />
+                )}
                 {!closed && (
                   <Can permission={PERMISSIONS.reconciliationClose}>
                     <Button

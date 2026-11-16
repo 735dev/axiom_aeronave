@@ -55,9 +55,6 @@ const PassengersSearchPage = lazy(() =>
     default: m.PassengersSearchPage,
   })),
 );
-const QuickLogPage = lazy(() =>
-  import('@/features/tickets/quicklog/QuickLogPage').then((m) => ({ default: m.QuickLogPage })),
-);
 const RulesPage = lazy(() =>
   import('@/features/tickets/pages/RulesPage').then((m) => ({ default: m.RulesPage })),
 );
@@ -96,14 +93,7 @@ export function AppRoutes() {
               </RequirePermission>
             }
           />
-          <Route
-            path="/bitacora-rapida"
-            element={
-              <RequirePermission permission={PERMISSIONS.ticketsCreate}>
-                <QuickLogPage />
-              </RequirePermission>
-            }
-          />
+          <Route path="/bitacora-rapida" element={<Navigate to="/tickets" replace />} />
           <Route
             path="/usuarios"
             element={

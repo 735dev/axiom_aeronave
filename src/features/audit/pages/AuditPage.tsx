@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useAuditLog } from '../hooks/useAudit';
 import { exportAuditCsv } from '../api/auditApi';
 import { AuditDetail } from '../components/AuditDetail';
 import { AuditAction, AuditEntity, AuditEvent, AuditFilters } from '../types/audit.types';
 import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
+import { ExportButton } from '@/shared/components/list/ExportButton';
+import { CsvColumn } from '@/shared/utils/csv';
 import { ListToolbar, FilterDef } from '@/shared/components/list/ListToolbar';
 import { Badge } from '@/shared/components/ui/badge';
 import { Column, DataTable } from '@/shared/components/list/DataTable';
@@ -14,8 +16,22 @@ import { PaginatedComplete } from '@/shared/components/pagination/PaginatedCompl
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { orUndefined, useListFilters } from '@/shared/hooks/useListFilters';
 import { useT } from '@/shared/hooks/useT';
-import { downloadCsv } from '@/shared/utils/csv';
-import { notify } from '@/shared/utils/notify';
+import { parseCsv } from '@/shared/utils/csv';
+
+/** Mismas cabeceras que EXPORT_HEADERS del servidor. */
+const AUDIT_HEADERS = [
+  'Secuencia',
+  'Fecha (UTC)',
+  'Actor',
+  'Rol del actor',
+  'Acción',
+  'Entidad',
+  'Id de la entidad',
+  'Etiqueta',
+  'Resumen',
+  'Cambios',
+  'IP',
+] as const;
 
 const ACTIONS: AuditAction[] = [
   'create',
@@ -49,7 +65,6 @@ export function AuditPage() {
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search, 300);
   const { values, setFilter, reset } = useListFilters();
-  const [exporting, setExporting] = useState(false);
   // Cada hecho es una línea; el detalle se abre a pedido y puede haber varios abiertos.
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -88,16 +103,19 @@ export function AuditPage() {
     { key: 'to', label: t('audit.to'), type: 'date' },
   ];
 
-  // El servidor arma el CSV con los mismos filtros: es la fuente de la verdad de la bitácora.
-  const onExport = async () => {
-    setExporting(true);
+  const auditColumns: CsvColumn<string[]>[] = AUDIT_HEADERS.map((header, index) => ({
+    header,
+    value: (row) => row[index] ?? '',
+  }));
+
+  // El servidor arma el corte con los mismos filtros. Acá se elige PDF o Excel y las columnas.
+  const loadAudit = async () => {
     const res = await exportAuditCsv(filters);
-    setExporting(false);
-    if (!res.ok) {
-      notify.fromApiError(res);
-      return;
-    }
-    downloadCsv(res.data.filename, res.data.text);
+    if (!res.ok) return res;
+    const [head, ...body] = parseCsv(res.data.text);
+    const index = new Map((head ?? []).map((header, i) => [header.trim(), i]));
+    const rows = body.map((row) => AUDIT_HEADERS.map((header) => row[index.get(header) ?? -1] ?? ''));
+    return { ok: true as const, data: { rows, truncated: false } };
   };
 
   const columns: Column<AuditEvent>[] = [
@@ -158,16 +176,14 @@ export function AuditPage() {
             reset();
           }}
           actions={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={exporting || total === 0}
-              onClick={() => void onExport()}
-            >
-              <Download className="h-4 w-4" />
-              {exporting ? t('common.loading') : t('list.export')}
-            </Button>
+            <ExportButton
+              filename="bitacora"
+              title={t('audit.title')}
+              columns={auditColumns}
+              figures={[{ label: t('list.exportPick.records'), value: total }]}
+              load={loadAudit}
+              disabled={total === 0}
+            />
           }
         />
       </Card>

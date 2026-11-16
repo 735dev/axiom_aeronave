@@ -12,6 +12,8 @@ interface Props {
   files: AttachmentInput[];
   onChange: (files: AttachmentInput[]) => void;
   disabled?: boolean;
+  /** Endereza la foto como comprobante. Una evidencia se guarda tal cual. */
+  scan?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * Es lo que permite fotografiar el comprobante y crear el gasto en un solo
  * paso, también sin señal: el registro y su foto viajan juntos en la cola.
  */
-export function PendingFiles({ files, onChange, disabled }: Props) {
+export function PendingFiles({ files, onChange, disabled, scan }: Props) {
   const t = useT();
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,7 +37,7 @@ export function PendingFiles({ files, onChange, disabled }: Props) {
     }
     setPreparing(true);
     try {
-      onChange([...files, await toAttachmentInput(file)]);
+      onChange([...files, await toAttachmentInput(file, undefined, { scan })]);
     } catch (e) {
       notify.toast.error(
         e instanceof AttachmentRejected ? t(e.messageKey, e.vars) : t('attachments.failed'),

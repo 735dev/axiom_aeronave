@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
-import { FieldDef, FieldRole, FieldType } from '../../types/ticket.types';
+import { FieldDef, FieldRole, FieldType, StepDef } from '../../types/ticket.types';
 import { CatalogKey } from '@/features/catalogs/types/catalog.types';
 import { Input } from '@/shared/components/ui/input';
 import { Select } from '@/shared/components/ui/select';
@@ -50,6 +50,7 @@ const CATALOG_KEYS: CatalogKey[] = [
   'airports',
   'fbos',
   'fuel_suppliers',
+  'suppliers',
   'users:pilot',
   'locations',
 ];
@@ -59,6 +60,7 @@ interface Props {
   index: number;
   total: number;
   permissions: PermissionOption[];
+  steps: StepDef[];
   onChange: (field: FieldDef) => void;
   onRemove: () => void;
   onMove: (direction: -1 | 1) => void;
@@ -69,12 +71,15 @@ export function FieldEditor({
   index,
   total,
   permissions,
+  steps,
   onChange,
   onRemove,
   onMove,
 }: Props) {
   const t = useT();
   const set = (patch: Partial<FieldDef>) => onChange({ ...field, ...patch });
+  const stepOptions = steps.filter((step) => step.code);
+  const knownStep = stepOptions.some((step) => step.code === field.step_code);
 
   return (
     <div className="rounded-lg border border-border p-3">
@@ -192,6 +197,23 @@ export function FieldEditor({
             ))}
           </Select>
           <p className="mt-1 text-xs text-muted-foreground">{t('ticketTypes.fields.roleHint')}</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Label className="mb-1.5 block">{t('ticketTypes.fields.step')}</Label>
+          <Select
+            value={field.step_code ?? ''}
+            onChange={(e) => set({ step_code: e.target.value || undefined })}
+          >
+            <option value="">{t('ticketTypes.fields.stepNone')}</option>
+            {field.step_code && !knownStep && <option value={field.step_code}>{field.step_code}</option>}
+            {stepOptions.map((step) => (
+              <option key={step.code} value={step.code}>
+                {step.name || step.code}
+              </option>
+            ))}
+          </Select>
+          <p className="mt-1 text-xs text-muted-foreground">{t('ticketTypes.fields.stepHint')}</p>
         </div>
 
         <label className="flex cursor-pointer items-center gap-2 text-sm">

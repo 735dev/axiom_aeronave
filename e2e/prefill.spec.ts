@@ -17,7 +17,7 @@ test('al fotografiar el comprobante el sistema propone el renglón y marca lo le
   await expect(page.getByTestId('read-amount')).toBeVisible();
   await expect(page.getByTestId('read-supplier')).toBeVisible();
   await expect(page.locator('input[name="amount"]')).not.toHaveValue('');
-  await expect(page.locator('input[name="supplier"]')).not.toHaveValue('');
+  await expect(page.locator('[name="supplier"]')).not.toHaveValue('');
 });
 
 test('lo leído con confianza alta se puede guardar sin confirmar uno por uno', async ({ page }) => {

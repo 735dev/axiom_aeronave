@@ -37,6 +37,7 @@ export function normalizeFields(raw: unknown): FieldDef[] {
         role: f.role || undefined,
         view_permission: f.view_permission || undefined,
         edit_permission: f.edit_permission || undefined,
+        step_code: f.step_code || undefined,
         sort_order: index + 1,
       } as FieldDef;
     })
@@ -60,6 +61,7 @@ export function normalizeStatuses(raw: unknown): StatusDef[] {
         is_final: Boolean(s.is_final),
         // Por omisión un estado cuenta; solo rechazo/anulación lo desactivan.
         counts_as_committed: s.counts_as_committed ?? true,
+        advance_rules: Array.isArray(s.advance_rules) ? s.advance_rules : undefined,
       } as StatusDef;
     })
     .filter((s): s is StatusDef => s !== null);

@@ -147,7 +147,12 @@ export function PassengersSearchPage() {
           actions={
             <ExportButton
               filename={t('passengerSearch.title')}
+              title={t('passengerSearch.title')}
               columns={csvColumns}
+              figures={[
+                { label: t('list.exportPick.people'), value: list.filtered.length },
+                { label: t('list.exportPick.operations'), value: tripRows.length },
+              ]}
               load={loadRows(tripRows)}
               disabled={tripRows.length === 0}
             />

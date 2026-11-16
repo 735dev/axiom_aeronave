@@ -68,7 +68,7 @@ export function ModulesPage() {
     { header: t('listData.csv.description'), value: (m) => m.description },
     { header: t('listData.csv.route'), value: (m) => m.route },
     { header: t('listData.csv.inMenu'), value: (m) => yesNo(Boolean(m.show_in_menu && m.route)) },
-    { header: t('listData.csv.permissions'), value: (m) => m.permissions_count },
+    { header: t('listData.csv.permissions'), value: (m) => m.permissions_count, origen: 'calculado' },
     { header: t('listData.csv.system'), value: (m) => yesNo(m.is_system) },
     { header: t('listData.csv.active'), value: (m) => yesNo(m.is_active) },
   ];

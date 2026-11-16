@@ -132,6 +132,7 @@
     "genericTitle": "Algo salió mal",
     "genericDetail": "No se pudo completar la operación.",
     "title": {
+      "0": "Sin conexión",
       "200": "Listo",
       "201": "Creado correctamente",
       "204": "Eliminado correctamente",
@@ -175,8 +176,7 @@
     "review": "Validación",
     "reconciliation": "Conciliación",
     "rules": "Reglas",
-    "passengerSearch": "Pasajeros",
-    "quicklog": "Bitácora de vuelo"
+    "passengerSearch": "Pasajeros"
   },
   "notifications": {
     "kind": {
@@ -368,6 +368,8 @@
     "onlyOpen": "Abiertos",
     "onlyClosed": "Cerrados",
     "decideAsAdmin": "Registrar por el rol",
+    "stepHint": "Completa esto y pulsa Registrar. Con eso tu paso queda cumplido.",
+    "stepPhoto": "Si tienes una foto de la falla, súbela en Comprobantes.",
     "readOnlyField": "Solo lectura",
     "ruleHits": "Avisos de reglas",
     "confirmReadFields": "Confirma los datos marcados antes de guardar: el sistema no está seguro de ellos.",
@@ -412,6 +414,9 @@
       "required": "Obligatorio",
       "viewPermission": "Permiso para ver el campo",
       "editPermission": "Permiso para editar el campo",
+      "step": "Se responde en el paso",
+      "stepNone": "Formulario general",
+      "stepHint": "Lo completa quien tiene el rol de ese paso.",
       "roleNone": "Ninguno (campo libre)",
       "roleHint": "De este campo salen los totales, el número del expediente y la lectura de comprobantes. Un rol identifica un solo campo.",
       "roles": {
@@ -453,6 +458,7 @@
       "service_types": "Tipos de servicio",
       "fbos": "FBO",
       "fuel_suppliers": "Proveedores de combustible",
+      "suppliers": "Proveedores",
       "users:pilot": "Capitanes (usuarios con rol piloto)",
       "aircraft_statuses": "Estados de aeronave",
       "aircrafts": "Aeronaves",
@@ -474,6 +480,15 @@
     "stepsHint": "Cada paso deja registro de quién decidió, qué decidió y cuándo.",
     "isInitial": "Estado inicial",
     "isFinal": "Cierra el ticket",
+    "advanceAll": "Llega al completar todos los pasos obligatorios",
+    "advanceStep": "Llega al registrar el paso",
+    "advanceFieldNone": "Sin mirar un campo",
+    "advanceEquals": "Cuando el campo vale",
+    "advanceYes": "Sí",
+    "advanceNo": "No",
+    "advanceOnly": "Solo si ese es el único paso registrado",
+    "advanceAdd": "Agregar condición",
+    "advanceHint": "Sin condiciones, el estado se elige a mano.",
     "isRoot": "Es un expediente que agrupa otros tickets",
     "childTypes": "Tipos que puede contener",
     "rootBadge": "Expediente",
@@ -677,9 +692,9 @@
       "why": "Un cierre no se reabre: el resultado ya está disponible para el sistema administrativo y reabrirlo cambiaría cifras que alguien firmó. Si hubo un error, se corrige con un asiento en el período siguiente."
     },
     "export": {
-      "action": "Exportar CSV",
+      "action": "Exportar",
       "done": "Detalle exportado",
-      "file": "conciliacion-{period}.csv"
+      "file": "conciliacion-{period}"
     },
     "csv": {
       "code": "Gasto",
@@ -768,42 +783,6 @@
     "none": "Sin resultados",
     "trips": "{count} operaciones"
   },
-  "quicklog": {
-    "title": "Bitácora de vuelo",
-    "saved": "Bitácora guardada",
-    "operation": "Operación",
-    "pickOperation": "Elegir operación",
-    "departure": "Salida real",
-    "arrival": "Llegada real",
-    "now": "Ahora",
-    "nextDay": "Llegó al día siguiente",
-    "finding": "Hubo novedad",
-    "notePlaceholder": "Nota corta",
-    "save": "Guardar bitácora",
-    "viewFile": "Ver expediente {code}",
-    "noAccess": "Tu rol no puede registrar la bitácora de vuelo.",
-    "errors": {
-      "operation": "Elige la operación.",
-      "departureRequired": "Falta la hora de salida.",
-      "arrivalRequired": "Falta la hora de llegada.",
-      "timeInvalid": "Hora inválida.",
-      "sameTime": "Salida y llegada son iguales. Revisa las horas.",
-      "arrivalBeforeDeparture": "La llegada es anterior a la salida. Si aterrizó al día siguiente, activa \"Llegó al día siguiente\".",
-      "noteRequired": "Describe la novedad con una nota corta o un toque en las opciones.",
-      "noteTooLong": "La nota admite hasta 280 caracteres."
-    },
-    "chips": {
-      "engine": "Motor",
-      "landing_gear": "Tren de aterrizaje",
-      "avionics": "Aviónica",
-      "hydraulic": "Hidráulico",
-      "electric": "Eléctrico",
-      "tires": "Neumáticos",
-      "fuel": "Combustible",
-      "weather": "Clima",
-      "bird": "Impacto de ave"
-    }
-  },
   "passengers": {
     "title": "Pasajeros",
     "name": "Nombre y apellido",
@@ -885,6 +864,21 @@
     "clear": "Limpiar filtros",
     "export": "Exportar",
     "exportTruncated": "Se exportaron los primeros {max} registros. Afina los filtros para el resto.",
+    "exportPick": {
+      "subtitle": "PDF para leer o imprimir. Excel para seguir trabajando. Marca lo que entra.",
+      "calculated": "Datos calculados",
+      "calculatedHint": "Cifras que ya se ven en la pantalla.",
+      "columns": "Columnas de la tabla",
+      "columnsHint": "Las columnas del listado.",
+      "all": "Todos",
+      "pdf": "PDF",
+      "excel": "Excel",
+      "empty": "No hay campos para exportar.",
+      "needOne": "Elige al menos un campo.",
+      "records": "Registros",
+      "people": "Personas",
+      "operations": "Operaciones"
+    },
     "noResults": "Sin resultados con estos filtros",
     "filter": {
       "status": "Estado",

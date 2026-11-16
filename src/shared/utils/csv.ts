@@ -1,6 +1,8 @@
 export interface CsvColumn<T> {
   header: string;
   value: (row: T) => string | number | boolean | null | undefined;
+  /** `calculado` agrupa la cifra con los datos que ya se ven, no con las columnas. */
+  origen?: 'tabla' | 'calculado';
 }
 
 /** Una celda que Excel/Sheets interpretaría como fórmula se neutraliza con un apóstrofo. */

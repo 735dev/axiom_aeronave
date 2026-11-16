@@ -171,6 +171,10 @@ export function notifyTicketCreated(ticket: Ticket, parent?: Ticket) {
   const coveredRoles = new Set(specific.flatMap((e) => clean(e.roles)));
   const roles = clean(assigned.roles).filter((r) => !coveredRoles.has(r));
   const users = clean(assigned.users);
+  if (ticket.type_is_root) {
+    const pilot = roleIdByCode('pilot');
+    if (pilot && !coveredRoles.has(pilot) && !roles.includes(pilot)) roles.push(pilot);
+  }
   if (roles.length === 0 && users.length === 0) return;
 
   notify({

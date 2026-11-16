@@ -75,13 +75,15 @@ export function CatalogListPanel() {
     },
   ];
 
-  // Mismas cabeceras que la plantilla de importación: lo exportado se puede volver a importar.
   const exportColumns: CsvColumn<CatalogItem>[] = [
-    { header: 'code', value: (i) => i.code },
-    { header: 'name', value: (i) => i.name },
-    { header: 'extra', value: (i) => i.extra },
-    { header: 'is_active', value: (i) => i.is_active },
-    { header: 'is_system', value: (i) => i.is_system },
+    { header: t('list.col.name'), value: (i) => i.name },
+    { header: t('list.col.code'), value: (i) => i.code },
+    { header: t('list.col.extra'), value: (i) => i.extra },
+    {
+      header: t('list.col.status'),
+      value: (i) => (i.is_active ? t('list.filter.active') : t('list.filter.inactive')),
+    },
+    { header: t('list.col.system'), value: (i) => (i.is_system ? t('common.yes') : t('common.no')) },
   ];
 
   const columns: Column<CatalogItem>[] = [
@@ -161,7 +163,11 @@ export function CatalogListPanel() {
             <>
               <ExportButton
                 filename={`catalogo-${active}`}
+                title={current?.name ?? t('nav.catalogs')}
                 columns={exportColumns}
+                figures={[
+                  { label: t('list.exportPick.records'), value: items.total },
+                ]}
                 disabled={items.total === 0}
                 load={() => fetchAllPages(getCatalogItems, items.query)}
               />

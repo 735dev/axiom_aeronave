@@ -241,17 +241,18 @@ test('una operación real recorre el ciclo completo (Alcance §12)', async ({ br
     expect(ok.status).toBe(200);
   });
 
-  // 6. El piloto registra la bitácora y levanta el reporte técnico con foto; mantenimiento responde.
-  await test.step('6. bitácora del piloto, reporte con evidencia y respuesta de mantenimiento', async () => {
+  // 6. El piloto registra el vuelo en el reporte técnico y adjunta la foto; mantenimiento responde.
+  await test.step('6. reporte de la tripulación, evidencia y respuesta de mantenimiento', async () => {
     const page = await sessionAs(browser, s.pilot, PHONE);
-    await page.goto('/bitacora-rapida');
-    await page.getByTestId('quicklog-operation').selectOption(opId);
-    await page.getByTestId('quicklog-departure').fill('08:00');
-    await page.getByTestId('quicklog-arrival').fill('09:30');
-    await page.getByTestId('quicklog-finding').click();
-    await page.getByTestId('quicklog-chip-engine').click();
-    await page.getByTestId('quicklog-save').click();
-    await expect(page.getByText('Bitácora guardada')).toBeVisible();
+    await page.goto(`/tickets/${reportId}`);
+    const report = page.locator('li').filter({ hasText: 'Reporte de la tripulación' });
+    await report.getByRole('button', { name: 'Registrar' }).click();
+    await report.locator('input[name="actual_departure"]').fill('08:00');
+    await report.locator('input[name="actual_arrival"]').fill('09:30');
+    await report.getByRole('checkbox', { name: '¿Presentó novedad?' }).check();
+    await report.locator('textarea[name="description"]').fill('Motor');
+    await report.getByRole('button', { name: 'Registrar' }).click();
+    await expect(page.getByText('Motor')).toBeVisible();
 
     await page.goto(`/tickets/${reportId}`);
     await page.getByTestId('attach-file-input').setInputFiles({
@@ -337,14 +338,19 @@ test('una operación real recorre el ciclo completo (Alcance §12)', async ({ br
     // El botón del manifiesto es el primero; el último es el de los datos de la operación.
     await page.getByRole('button', { name: 'Guardar' }).first().click();
     await expect(page.getByText('Manifiesto actualizado')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Pasajeros' })).toHaveCount(0);
+    await page.goto('/pasajeros');
+    await expect(page).toHaveURL(/\/tickets/);
+    await page.context().close();
 
     const manifest = (await su.get(`/tickets/${opId}/passengers/`)).data;
     expect(manifest).toHaveLength(1);
 
-    await page.goto('/pasajeros');
-    await page.getByTestId('passenger-search-input').fill('maria jose');
-    await expect(page.getByText(opCode).first()).toBeVisible();
-    await page.context().close();
+    const lookup = await sessionAs(browser, s.super);
+    await lookup.goto('/pasajeros');
+    await lookup.getByTestId('passenger-search-input').fill('maria jose');
+    await expect(lookup.getByText(opCode).first()).toBeVisible();
+    await lookup.context().close();
   });
 
   // 9. Total en ambas monedas, soportes y cierre firmado.

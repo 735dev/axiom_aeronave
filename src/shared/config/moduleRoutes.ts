@@ -24,7 +24,6 @@ import type { LucideIcon } from 'lucide-react';
 export const MODULE_ROUTES: Array<{ route: string; labelKey: string }> = [
   { route: '/tickets', labelKey: 'nav.tickets' },
   { route: '/avisos', labelKey: 'nav.notifications' },
-  { route: '/bitacora-rapida', labelKey: 'nav.quicklog' },
   { route: '/pasajeros', labelKey: 'nav.passengerSearch' },
   { route: '/usuarios', labelKey: 'nav.users' },
   { route: '/roles', labelKey: 'nav.roles' },

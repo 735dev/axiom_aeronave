@@ -41,6 +41,7 @@ function status(
     is_initial: extra.is_initial ?? order === 1,
     is_final: extra.is_final ?? false,
     counts_as_committed: extra.counts_as_committed ?? true,
+    advance_rules: extra.advance_rules,
   };
 }
 
@@ -181,7 +182,7 @@ export const ticketTypes: TicketType[] = [
       field('expense_date', 'Fecha del gasto', 'date', 4, { width: 'half', role: 'accounting_date' }),
       field('quantity', 'Cantidad', 'number', 5, { width: 'half', role: 'quantity' }),
       field('unit', 'Unidad', 'select', 6, { catalog: 'units', width: 'half', role: 'unit' }),
-      field('supplier', 'Proveedor', 'text', 7, { role: 'supplier' }),
+      field('supplier', 'Proveedor', 'select', 7, { catalog: 'suppliers', role: 'supplier' }),
       field('support', 'Comprobante', 'file', 8),
       field('notes', 'Observaciones', 'textarea', 9),
     ],
@@ -207,9 +208,9 @@ export const ticketTypes: TicketType[] = [
     is_active: true,
     tickets_count: 0,
     fields: [
-      field('actual_departure', 'Salida real', 'time', 1, { width: 'half' }),
-      field('actual_arrival', 'Llegada real', 'time', 2, { width: 'half' }),
-      field('has_finding', '¿Presentó novedad?', 'checkbox', 3, { width: 'half' }),
+      field('actual_departure', 'Salida real', 'time', 1, { width: 'half', step_code: 'report' }),
+      field('actual_arrival', 'Llegada real', 'time', 2, { width: 'half', step_code: 'report' }),
+      field('has_finding', '¿Presentó novedad?', 'checkbox', 3, { width: 'half', step_code: 'report' }),
       field('system', 'Sistema afectado', 'select', 4, {
         width: 'half',
         options: [
@@ -220,29 +221,52 @@ export const ticketTypes: TicketType[] = [
           { value: 'electric', label: 'Eléctrico' },
           { value: 'other', label: 'Otro' },
         ],
+        step_code: 'report',
       }),
-      field('ata_failure_code', 'Código ATA falla', 'text', 5, { width: 'half' }),
-      field('description', 'Descripción de la falla', 'textarea', 6, { required: true }),
-      field('photo', 'Evidencia', 'file', 7),
+      field('ata_failure_code', 'Código ATA falla', 'text', 5, { width: 'half', step_code: 'report' }),
+      field('description', 'Descripción de la falla', 'textarea', 6, { required: true, step_code: 'report' }),
+      field('photo', 'Evidencia', 'file', 7, { step_code: 'report' }),
       field('corrective_action', 'Acción correctiva', 'textarea', 8, {
         edit_permission: 'tickets.edit.technical_report',
         help: 'Lo llena mantenimiento. Los demás lo ven en solo lectura.',
+        step_code: 'diagnosis',
       }),
       field('aircraft_status', 'Estado de la aeronave', 'select', 9, {
         catalog: 'aircraft_statuses',
         width: 'half',
+        step_code: 'diagnosis',
       }),
-      field('requires_workshop', '¿Requiere taller externo?', 'checkbox', 10, { width: 'half' }),
-      field('quotes', 'Cotizaciones de OMA', 'textarea', 11, { edit_permission: 'tickets.edit.technical_report' }),
-      field('director_authorization', 'Autorización de Gerencia General', 'textarea', 12, { edit_permission: 'tickets.decide_any' }),
-      field('observations', 'Observaciones', 'textarea', 13),
+      field('requires_workshop', '¿Requiere taller externo?', 'checkbox', 10, { width: 'half', step_code: 'diagnosis' }),
+      field('quotes', 'Cotizaciones de OMA', 'textarea', 11, {
+        edit_permission: 'tickets.edit.technical_report',
+        step_code: 'commercial',
+      }),
+      field('director_authorization', 'Autorización de Gerencia General', 'textarea', 12, {
+        edit_permission: 'tickets.decide_any',
+        step_code: 'commercial',
+      }),
+      field('observations', 'Observaciones', 'textarea', 13, { step_code: 'report' }),
     ],
     statuses: [
       status('reported', 'Reportada', 'info', 1, { is_initial: true }),
       status('in_review', 'En revisión', 'warning', 2),
-      status('grounded', 'Aeronave detenida', 'danger', 3),
-      status('solved', 'Resuelta', 'success', 4, { is_final: true }),
-      status('no_findings', 'Sin novedad', 'success', 5, { is_final: true, counts_as_committed: false }),
+      status('grounded', 'Aeronave detenida', 'danger', 3, {
+        advance_rules: [
+          { when: 'step', step_code: 'diagnosis', field_key: 'requires_workshop', equals: true },
+          { when: 'step', step_code: 'diagnosis', field_key: 'aircraft_status', equals: 'grounded' },
+        ],
+      }),
+      status('solved', 'Resuelta', 'success', 4, {
+        is_final: true,
+        advance_rules: [{ when: 'all_required' }],
+      }),
+      status('no_findings', 'Sin novedad', 'success', 5, {
+        is_final: true,
+        counts_as_committed: false,
+        advance_rules: [
+          { when: 'step', step_code: 'report', field_key: 'has_finding', equals: false, only_this_step: true },
+        ],
+      }),
     ],
     steps: [
       step('report', 'Reporte de la tripulación', 1, 'r-3', 'Piloto'),

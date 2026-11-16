@@ -9,11 +9,13 @@ import { TicketsList } from '../components/TicketsList';
 import { NewTicketDialog } from '../components/NewTicketDialog';
 import { TotalsPanel } from '../components/TotalsPanel';
 import { AttachmentsPanel } from '../components/AttachmentsPanel';
+import { scansReceipts } from '../utils/prepareFile';
 import { PassengersPanel } from '../components/PassengersPanel';
 import { ClosingPanel } from '../components/ClosingPanel';
 import { AuditTimeline } from '@/features/audit/components/AuditTimeline';
 import { useEntityAudit } from '@/features/audit/hooks/useAudit';
 import { DynamicValues } from '../schemas/dynamicSchema';
+import { stepOwnedKeys } from '../utils/stepFields';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -56,24 +58,34 @@ export function TicketDetailPage() {
   }
 
   const type = types.find((x) => x.code === ticket.type_code);
+  const owned = type ? stepOwnedKeys(type.fields, type.steps) : new Set<string>();
+  // Un estado con condiciones llega solo. Si ninguno las tiene, se elige a mano.
+  const statusFollowsSteps = Boolean(type?.statuses.some((status) => status.advance_rules?.length));
+  const looseFields = type ? type.fields.filter((field) => !owned.has(field.key)) : [];
   const childTypes = types.filter((x) => type?.child_type_codes.includes(x.code));
   // Un expediente en estado final es inmutable: el servidor responde 409 a
   // cualquier cambio, así que la pantalla deja de ofrecerlo.
   const isLocked = ticket.status_is_final;
   const canEdit = canForType('edit', ticket.type_code) && !isLocked;
 
-  const onSave = async (values: DynamicValues) => {
+  const persist = async (values: DynamicValues): Promise<boolean> => {
     setSubmitting(true);
     const res = await updateTicket(ticket.id, { payload: values });
     setSubmitting(false);
     if (res.ok) {
       setFieldErrors(undefined);
-      notify.toast.success(t('tickets.savedOk'));
-      void reload();
-      return;
+      return true;
     }
     setFieldErrors(res.fieldErrors ? { ...res.fieldErrors } : undefined);
     notify.fromApiError(res);
+    return false;
+  };
+
+  const onSave = async (values: DynamicValues) => {
+    const ok = await persist(values);
+    if (!ok) return;
+    notify.toast.success(t('tickets.savedOk'));
+    void reload();
   };
 
   const onStatus = async (statusCode: string) => {
@@ -154,15 +166,19 @@ export function TicketDetailPage() {
               ticketId={ticket.id}
               steps={type.steps}
               decisions={ticket.decisions}
+              fields={type.fields}
+              payload={ticket.payload}
               canDecide={canEdit}
               canDecideAny={can(PERMISSIONS.ticketsDecideAny)}
+              serverErrors={fieldErrors}
+              onSave={persist}
               onDecided={reload}
             />
           </CardContent>
         </Card>
       )}
 
-      {type && canEdit && (
+      {type && canEdit && !statusFollowsSteps && (
         <Card>
           <CardHeader>
             <CardTitle className="label-strip">{t('tickets.state')}</CardTitle>
@@ -298,30 +314,29 @@ export function TicketDetailPage() {
             ticketId={ticket.id}
             files={ticket.files}
             readOnly={!canEdit}
+            scan={scansReceipts(type?.fields)}
             onUploaded={reload}
           />
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="label-strip">{t('tickets.data')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {type ? (
+      {looseFields.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="label-strip">{t('tickets.data')}</CardTitle>
+          </CardHeader>
+          <CardContent>
             <DynamicForm
-              fields={type.fields}
+              fields={looseFields}
               defaultValues={ticket.payload}
               isSubmitting={isSubmitting}
               readOnly={!canEdit}
               serverErrors={fieldErrors}
               onSubmit={onSave}
             />
-          ) : (
-            <p className="text-sm text-muted-foreground">{t('tickets.typeMissing')}</p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

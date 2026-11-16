@@ -228,6 +228,7 @@ export function TicketTypeForm({ type, allTypes, onSuccess, onClose }: Props) {
                 index={index}
                 total={fields.length}
                 permissions={permissions}
+                steps={steps}
                 onChange={(next) =>
                   setFields((prev) =>
                     prev.map((f, i) => {
@@ -277,6 +278,8 @@ export function TicketTypeForm({ type, allTypes, onSuccess, onClose }: Props) {
                 status={status}
                 index={index}
                 total={statuses.length}
+                steps={steps}
+                fields={fields}
                 onChange={(next) =>
                   setStatuses((prev) => prev.map((s, i) => (i === index ? next : s)))
                 }

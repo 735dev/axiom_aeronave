@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AttachmentInput, readReceipt } from '../api/ticketsApi';
 import { createWithAttachments } from '../api/createWithAttachments';
 import { PendingFiles } from './PendingFiles';
+import { scansReceipts } from '../utils/prepareFile';
 import { DynamicForm } from './DynamicForm';
 import { Extraction, TicketType } from '../types/ticket.types';
 import { DynamicValues } from '../schemas/dynamicSchema';
@@ -168,7 +169,12 @@ export function NewTicketDialog({
               ‹ {t('common.back')}
             </Button>
             {!selected.is_root && (
-              <PendingFiles files={files} onChange={setFiles} disabled={isSubmitting} />
+              <PendingFiles
+                files={files}
+                onChange={setFiles}
+                disabled={isSubmitting}
+                scan={scansReceipts(selected.fields)}
+              />
             )}
             <DynamicForm
               fields={selected.fields}

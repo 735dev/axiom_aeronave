@@ -61,9 +61,20 @@ export interface FieldDef {
   view_permission?: string;
   /** Sin este permiso el campo se muestra en solo lectura. */
   edit_permission?: string;
+  /** Paso en el que se responde. Vacío: el campo sigue en el formulario general. */
+  step_code?: string;
   /** Campo generado por el sistema: visible, pero no editable. */
   read_only?: boolean;
   sort_order: number;
+}
+
+/** Condición que mueve el ticket a un estado al registrar un paso. */
+export interface StatusAdvanceRule {
+  when?: 'step' | 'all_required';
+  step_code?: string;
+  field_key?: string;
+  equals?: boolean | string | number;
+  only_this_step?: boolean;
 }
 
 /** Estado configurable. Cada tipo define los suyos. */
@@ -80,6 +91,8 @@ export interface StatusDef {
    * para esto: "rechazado" también es final y no debe sumar.
    */
   counts_as_committed: boolean;
+  /** Vacío: alguien lo elige. Con condiciones, el registro de un paso lo alcanza. */
+  advance_rules?: StatusAdvanceRule[];
 }
 
 /** Paso del flujo. Tiene responsable y deja registro de quién decidió. */

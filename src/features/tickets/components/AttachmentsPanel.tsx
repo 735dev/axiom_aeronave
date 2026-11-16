@@ -19,6 +19,8 @@ interface Props {
   ticketId: string;
   files: Attachment[];
   readOnly?: boolean;
+  /** Endereza la foto como comprobante. Una evidencia se guarda tal cual. */
+  scan?: boolean;
   onUploaded: () => void;
 }
 
@@ -34,7 +36,7 @@ interface Chain {
  */
 const chains = new Map<string, Chain>();
 
-export function AttachmentsPanel({ ticketId, files, readOnly, onUploaded }: Props) {
+export function AttachmentsPanel({ ticketId, files, readOnly, scan, onUploaded }: Props) {
   const t = useT();
   const userId = useAppSelector((st) => st.auth.user?.id);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -53,11 +55,15 @@ export function AttachmentsPanel({ ticketId, files, readOnly, onUploaded }: Prop
     if (!file) return false;
     setUploading(true);
     try {
-      const input = await toAttachmentInput(file, (report) => {
-        if (report.path === 'full' && file.type.startsWith('image/')) {
-          notify.toast.info(t('attachments.scanFull'));
-        }
-      });
+      const input = await toAttachmentInput(
+        file,
+        (report) => {
+          if (report.path === 'full' && file.type.startsWith('image/')) {
+            notify.toast.info(t('attachments.scanFull'));
+          }
+        },
+        { scan },
+      );
       const outcome = await submitOrQueue(
         offlineQueue,
         {

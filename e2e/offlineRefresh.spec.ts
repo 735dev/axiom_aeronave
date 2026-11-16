@@ -22,21 +22,17 @@ test('al volver la red la cola sincroniza y la lista se refresca sola', async ({
   context,
 }) => {
   await login(page, 'piloto@transvalor.com');
-  // Se visitan ambas pantallas con red para que sus módulos queden cargados.
-  await page.goto('/bitacora-rapida');
-  await expect(page.getByTestId('quicklog-operation')).not.toHaveValue('');
-  await goClient(page, '/tickets?vista=work');
+  await page.goto('/tickets?vista=work');
   const rows = page.locator('a[href^="/tickets/"]');
   await expect(rows.first()).toBeVisible();
   const before = await rows.count();
 
-  // Sin señal: se guarda una bitácora desde la pantalla rápida (navegación interna, sin recargar).
+  // Sin señal: un ticket nuevo queda en la cola (navegación interna, sin recargar).
   await context.setOffline(true);
-  await goClient(page, '/bitacora-rapida');
-  await expect(page.getByTestId('quicklog-operation')).not.toHaveValue('');
-  await page.getByTestId('quicklog-departure').fill('08:00');
-  await page.getByTestId('quicklog-arrival').fill('09:30');
-  await page.getByTestId('quicklog-save').click();
+  await page.getByRole('button', { name: 'Nuevo ticket' }).click();
+  await page.getByRole('button', { name: /Novedad en hangar/ }).click();
+  await page.locator('textarea[name="description"]').fill('Fuga en el hangar');
+  await page.getByRole('button', { name: 'Crear' }).click();
   await expect(page.getByText(/Sin señal/).first()).toBeVisible();
 
   // De vuelta en la lista (aún sin red) no aparece nada nuevo.

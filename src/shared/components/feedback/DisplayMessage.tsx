@@ -11,6 +11,7 @@ import { useAppDispatch, useAppSelector } from '@/shared/store/hooks';
 import { hideInfoModal } from '@/shared/store/slices/uiSlice';
 import { useT } from '@/shared/hooks/useT';
 import { confirmRegistry } from '@/shared/utils/notify';
+import { resolveModalTitle } from './errorTitle';
 
 export function DisplayMessage() {
   const t = useT();
@@ -30,7 +31,7 @@ export function DisplayMessage() {
             {m.type === 'confirm' && <MessageCircleQuestion className="text-blue-500" strokeWidth={1} size={88} />}
           </div>
           <DialogTitle className="text-center text-xl">
-            {t(`errors.title.${m.code ?? 'generic'}`)}
+            {resolveModalTitle(t, m.code)}
           </DialogTitle>
           <DialogDescription className="text-center">{t(m.description)}</DialogDescription>
         </DialogHeader>
